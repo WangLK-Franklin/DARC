@@ -23,6 +23,7 @@ __all__ = [
     "ActionValueDistri",
     "StochaPolicyDis",
     "StateValue",
+    "ResFiniteHorizonPolicy",
 ]
 
 import numpy as np
@@ -111,6 +112,40 @@ class FiniteHorizonPolicy(nn.Module, Action_Distribution):
         ) + (self.act_high_lim + self.act_low_lim) / 2
         return action
 
+class ResFiniteHorizonPolicy(nn.Module, Action_Distribution):
+    def __init__(self, **kwargs):
+        super().__init__()
+        obs_dim = kwargs["obs_dim"] + 1
+        act_dim = kwargs["act_dim"]
+        hidden_sizes = kwargs["hidden_sizes"]
+
+        # pi_sizes = [obs_dim] + list(hidden_sizes) + [obs_dim]+ [act_dim]
+        pi_sizes = [obs_dim] + list(hidden_sizes) + [obs_dim]
+        self.pi = mlp(
+            pi_sizes,
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["output_activation"]),
+        )
+        self.pi_res = mlp(
+            [obs_dim] + [act_dim],
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["output_activation"]),
+        )
+        self.register_buffer("act_high_lim", torch.from_numpy(kwargs["act_high_lim"]))
+        self.register_buffer("act_low_lim", torch.from_numpy(kwargs["act_low_lim"]))
+        self.action_distribution_cls = kwargs["action_distribution_cls"]
+
+    def forward(self, obs, virtual_t=1):
+        virtual_t = virtual_t * torch.ones(
+            size=[obs.shape[0], 1], dtype=torch.float32, device=obs.device
+        )
+        expand_obs = torch.cat((obs, virtual_t), 1)
+        residual = self.pi(expand_obs)
+        res_obs = obs + residual
+        action = (self.act_high_lim - self.act_low_lim) / 2 * torch.tanh(
+            self.pi_res(res_obs)
+        ) + (self.act_high_lim + self.act_low_lim) / 2
+        return action
 
 class MultiplierNet(nn.Module, Action_Distribution):
     """

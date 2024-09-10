@@ -67,8 +67,8 @@ class ScaleActionModel(ActionModelWrapper):
                 device=model.action_lower_bound.device
             )
 
-        self.min_action = torch.zeros_like(model.action_lower_bound) + min_action
-        self.max_action = torch.zeros_like(model.action_upper_bound) + max_action
+        self.min_action = torch.zeros_like(torch.tensor(model.action_lower_bound)) + min_action
+        self.max_action = torch.zeros_like(torch.tensor(model.action_upper_bound)) + max_action
         self.action_lower_bound = self.min_action
         self.action_upper_bound = self.max_action
 

@@ -114,7 +114,7 @@ class PythVeh3dofcontiModel(PythBaseModel):
                 self.ref_traj.compute_x(
                     next_t + self.pre_horizon * self.dt, path_num, u_num
                 ),
-                self.ref_traj.compute_y(
+                self.ref_traj.compute_y( 
                     next_t + self.pre_horizon * self.dt, path_num, u_num
                 ),
                 self.ref_traj.compute_phi(
