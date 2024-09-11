@@ -141,7 +141,7 @@ class ResFiniteHorizonPolicy(nn.Module, Action_Distribution):
         )
         expand_obs = torch.cat((obs, virtual_t), 1)
         residual = self.pi(expand_obs)
-        res_obs = obs + residual
+        res_obs = expand_obs + residual
         action = (self.act_high_lim - self.act_low_lim) / 2 * torch.tanh(
             self.pi_res(res_obs)
         ) + (self.act_high_lim + self.act_low_lim) / 2
