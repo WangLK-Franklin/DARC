@@ -46,8 +46,8 @@ class ApproxContainer(ApprBase):
         self.policy_optimizer = Adam(
             self.policy.parameters(), lr=policy_learning_rate
         )
-        policy_args["obs_dim"]=6
-        policy_args["act_dim"]=1
+        policy_args["obs_dim"]=8
+        policy_args["act_dim"]=3
         policy_args["act_high_lim"]=np.array([1])
         policy_args["act_low_lim"]=np.array([-1])
         self.policy_d = create_apprfunc(**{**policy_args})
@@ -136,9 +136,10 @@ class FHADP(AlgorithmBase):
         info = data
         # w = data["watermarking"]
         v_pi = 0
+        v_d = 0 
         o_list.append(o)
         shape_tensor = torch.zeros((self.batch_size,self.envmodel.dim_watermarking))
-        w_zero = torch.randint(low=0, high=10, size=shape_tensor.shape)
+        w_zero = torch.rand(size=shape_tensor.shape)
         for step in range(self.pre_horizon):
             a = self.networks.policy(o, step + 1)
             o, r, d, info = self.envmodel.forward(o, a, d, info)
@@ -146,14 +147,16 @@ class FHADP(AlgorithmBase):
             # TODO: chaifen
             o_list.append(o)
         for step in range(int(self.pre_horizon)):
-            input  = torch.cat((o_list[step][:,self.envmodel.dim_state:self.envmodel.dim_state*2], w_zero),dim=1)
-            a_d =self.networks.policy_d(input,step + 1)
-            a_d = torch.clamp(a_d, min=-1, max=1)
+            input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
+            a_d = self.networks.policy_d(input,step + 1)
+            a_d = torch.tanh(a_d)
             u = w_zero + a_d
+            r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
             w_zero = u
-        loss_discriminator = torch.mean((o[:,-1].detach() - w_zero) ** 2)
-        loss_policy = -v_pi.mean()-loss_discriminator
-        loss_policy = -v_pi.mean()
+            v_d += r_d * (self.gamma ** step)
+
+        loss_policy = -v_pi.mean()-v_d.mean()
+        # loss_policy = -v_pi.mean()
         loss_info = {
             tb_tags["loss_actor"]: loss_policy.item()
         }

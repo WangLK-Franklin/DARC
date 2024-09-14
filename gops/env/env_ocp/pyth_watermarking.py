@@ -32,7 +32,7 @@ class Pythwatermarking(PythBaseEnv):
         self.dt = 1
         self.max_episode_steps = kwargs.pop("horizon", 200)
         self.sampler = WatermarkingSamlper()
-        
+        self.mode = kwargs["mode"]
         self.max_length=self.sampler.max_len
         self.observation_space = spaces.Box(
             low=np.array([-np.inf] * (self.dim_obs)),
@@ -64,7 +64,7 @@ class Pythwatermarking(PythBaseEnv):
         return additional_info
     
     def watermarking_generator(self):
-        return np.random.randint(low=0, high=10, size=self.dim_watermarking)
+        return np.random.rand(self.dim_watermarking)
     
     def reset(self, **kwargs):
         self.sample_flag = random.randint(0, self.max_length-self.max_episode_steps-1)
@@ -73,21 +73,37 @@ class Pythwatermarking(PythBaseEnv):
         self.t = 0
         self.done = False
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
+        # self.obs = np.concatenate([self.state, self.ref_points])
         info = {"state": self.obs,
                 "ref_time": self.t,
             "abs_time": self.sample_flag,}
         return self.obs, info
         
     def step(self, action: np.ndarray):
-        self.action = action
-        self.state = self.obs[:self.dim_state]
-        self.next_state = self.state + action
-        self.ref_points = self.sampler.sample(self.sample_flag+1)
-        self.reward = self.compute_reward()
-        self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
-        self.done = self.judge_done()
-        self.t += 1
-        self.sample_flag += 1
+        if self.mode == "train":
+
+            self.action = action
+            self.state = self.obs[:self.dim_state]
+            self.t += 1
+            self.next_state = self.sampler.sample(self.sample_flag+1)
+            self.sample_flag += 1
+            # self.next_state = self.state + action
+            self.ref_points = self.sampler.sample(self.sample_flag+1)
+            self.reward = self.compute_reward()
+            self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
+            # self.obs = np.concatenate([self.next_state, self.ref_points]) 
+            self.done = self.judge_train_done()
+        else:
+            self.action = action
+            self.state = self.obs[:self.dim_state]
+            self.t += 1
+            self.next_state = self.state + action
+            self.sample_flag +=1
+            self.ref_points = self.sampler.sample(self.sample_flag+1)
+            self.reward = self.compute_reward()
+            self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
+            # self.obs = np.concatenate([self.next_state, self.ref_points]) 
+            self.done = self.judge_eval_done()
         next_info = {}        
         next_info.update({
             "state": self.obs,
@@ -98,8 +114,12 @@ class Pythwatermarking(PythBaseEnv):
         
     def compute_reward(self):
         return -np.linalg.norm((self.next_state-self.obs[self.dim_state:self.dim_state*2]),2)
-    def judge_done(self):
+    def judge_train_done(self):
+        # return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
+        return (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)
+    def judge_eval_done(self):
         return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
+        # return  (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)
 
     
 

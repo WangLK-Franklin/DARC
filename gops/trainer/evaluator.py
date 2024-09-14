@@ -22,7 +22,9 @@ class Evaluator:
             "repeat_num": None,
             "gym2gymnasium": False,
             "vector_env_num": None,
+            "mode":"evaluate",
         })
+        self.kwargs = kwargs
         self.env = create_env(**kwargs)
 
         _, self.env = set_seed(kwargs["trainer"], kwargs["seed"], index + 400, self.env)
@@ -60,7 +62,9 @@ class Evaluator:
             action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
             action = action.detach().numpy()[0]
+
             next_obs, reward, done, next_info = self.env.step(action)
+            print("reward", reward)
             obs_list.append(obs)
             action_list.append(action)
             obs = next_obs

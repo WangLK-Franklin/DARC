@@ -62,6 +62,7 @@ class OffSerialTrainer:
 
         # pre sampling
         while self.buffer.size < kwargs["buffer_warm_size"]:
+            kwargs["mode"] = "train"
             samples, _ = self.sampler.sample()
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()

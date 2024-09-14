@@ -23,7 +23,7 @@ class PythwatermarkingModel(PythBaseEnv):
         **kwargs,
         ):
         self.max_episode_steps = pre_horizon
-        self.dim_obs = kwargs.pop("dim_state", 11)
+        self.dim_obs = kwargs.pop("dim_obs", 11)
         self.dim_watermarking =kwargs.pop("dim_watermarking", 1) 
         self.noise_flag = kwargs.pop("noise_flag", False)
         self.dim_state = int((self.dim_obs-self.dim_watermarking)/2)
@@ -60,6 +60,7 @@ class PythwatermarkingModel(PythBaseEnv):
         isdone = self.judge_done()  
         # next_obs = torch.cat((next_state,self.sampler.tensor_sample(sampler+1)),dim=1)
         next_obs = torch.cat([next_state, self.sampler.tensor_sample(self.sample_flag+1), obs[:,self.dim_state*2:]], dim=1)
+        # next_obs = torch.cat([next_state, self.sampler.tensor_sample(self.sample_flag+1)], dim=1)
         next_info = {}
         for key, value in info.items():
             next_info[key] = value.detach().clone()
