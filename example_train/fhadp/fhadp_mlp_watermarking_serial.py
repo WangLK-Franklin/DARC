@@ -21,8 +21,8 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_watermarking", help="id of environment")
-    parser.add_argument("--dim_watermarking", type=int, default="3", help="dim of watermarking")
-    parser.add_argument("--dim_obs", type=int, default="13", help="dim of watermarking")
+    parser.add_argument("--dim_watermarking", type=int, default="1", help="dim of watermarking")
+    parser.add_argument("--dim_obs", type=int, default="11", help="dim of watermarking")
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--pre_horizon", type=int, default=20)
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--policy_act_distribution", type=str, default="default")
     policy_func_type = parser.parse_known_args()[0].policy_func_type
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[512,1024, 512, 256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[512, 1024, 512, 256])
     parser.add_argument("--policy_hidden_activation", type=str, default="elu")
     parser.add_argument("--mode", type=str, default="train")
 

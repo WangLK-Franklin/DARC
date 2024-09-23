@@ -46,8 +46,8 @@ class ApproxContainer(ApprBase):
         self.policy_optimizer = Adam(
             self.policy.parameters(), lr=policy_learning_rate
         )
-        policy_args["obs_dim"]=8
-        policy_args["act_dim"]=3
+        policy_args["obs_dim"]=int((kwargs["dim_obs"]-kwargs["dim_watermarking"])/2+kwargs["dim_watermarking"])
+        policy_args["act_dim"]=kwargs["dim_watermarking"]
         policy_args["act_high_lim"]=np.array([1])
         policy_args["act_low_lim"]=np.array([-1])
         self.policy_d = create_apprfunc(**{**policy_args})
@@ -139,7 +139,7 @@ class FHADP(AlgorithmBase):
         v_d = 0 
         o_list.append(o)
         shape_tensor = torch.zeros((self.batch_size,self.envmodel.dim_watermarking))
-        w_zero = torch.rand(size=shape_tensor.shape)
+        w_zero = torch.zeros(size=shape_tensor.shape)
         for step in range(self.pre_horizon):
             a = self.networks.policy(o, step + 1)
             o, r, d, info = self.envmodel.forward(o, a, d, info)
@@ -155,9 +155,12 @@ class FHADP(AlgorithmBase):
             w_zero = u
             v_d += r_d * (self.gamma ** step)
 
-        loss_policy = -v_pi.mean()-v_d.mean()
+        loss_actor = -v_pi.mean()
+        loss_discriminator = -v_d.mean()
+        loss_policy = loss_actor + loss_discriminator
         # loss_policy = -v_pi.mean()
         loss_info = {
-            tb_tags["loss_actor"]: loss_policy.item()
+            tb_tags["loss_actor"]: loss_actor.item(),
+            tb_tags["loss_discriminator"]: loss_discriminator.item()
         }
         return loss_policy, loss_info

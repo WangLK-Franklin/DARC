@@ -3,7 +3,8 @@ import torch
 import numpy as np
 class WatermarkingSamlper:
     def __init__(self):
-        path =  "/home/wlk/watermarking/GOPS/gops/env/env_ocp/idc_controler_2024-6-6_16-2-36_default.csv" 
+        path =  "/home/wanglikun/data-watermarking/data/idc_controler_2024-6-6_16-2-36_default.csv"
+        self.watermarking = np.array([0.5])
         self.data = pd.read_csv(path)
         self.data = self.data.iloc[:,5:10].values
         self.max_len = len(self.data)
@@ -14,7 +15,7 @@ class WatermarkingSamlper:
             self.data[:,i] = (self.data[:,i]-self.min_values[i]) / self.delta[i] if self.delta[i] != 0 else self.data[:,i]
         
     def sample(self,sample_flag):
-        return self.data[sample_flag]
+        return self.data[sample_flag],self.watermarking
     def tensor_sample(self,sample_flag:torch.Tensor) -> torch.Tensor:
         sample_flag = sample_flag.tolist()
         slices = [int(x) for x in sample_flag]

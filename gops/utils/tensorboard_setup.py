@@ -159,6 +159,7 @@ tb_tags = {
     "TAR of replay samples": "Evaluation/4. TAR-Replay samples",
     "Buffer RAM of RL iteration": "RAM/RAM [MB]-RL iter",
     "loss_actor": "Loss/Actor loss-RL iter",
+    "loss_discriminator": "Loss/Discriminator loss-RL iter",
     "loss_actor_reward": "Loss/Actor reward loss-RL iter",
     "loss_actor_constraint": "Loss/Actor constraint loss-RL iter",
     "loss_critic": "Loss/Critic loss-RL iter",

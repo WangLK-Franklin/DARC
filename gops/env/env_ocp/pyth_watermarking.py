@@ -44,11 +44,11 @@ class Pythwatermarking(PythBaseEnv):
             high=np.full(shape=self.dim_state,fill_value=1, dtype=np.float32), 
             dtype=np.float32
         )
-        self.watermarking = self.watermarking_generator()
+        # self.watermarking = self.watermarking_generator()
         self.t = 0
         self.sample_flag = 0
-        self.state = self.sampler.sample(0)
-        self.ref_points = self.sampler.sample(1)
+        self.state,self.watermarking = self.sampler.sample(0)
+        self.ref_points,_ = self.sampler.sample(1)
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
         self.done = None
         self.seed()
@@ -68,8 +68,8 @@ class Pythwatermarking(PythBaseEnv):
     
     def reset(self, **kwargs):
         self.sample_flag = random.randint(0, self.max_length-self.max_episode_steps-1)
-        self.state= self.sampler.sample(self.sample_flag)
-        self.ref_points = self.sampler.sample(self.sample_flag+1)
+        self.state,self.watermarking = self.sampler.sample(self.sample_flag)
+        self.ref_points,_ = self.sampler.sample(self.sample_flag+1)
         self.t = 0
         self.done = False
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
@@ -85,10 +85,10 @@ class Pythwatermarking(PythBaseEnv):
             self.action = action
             self.state = self.obs[:self.dim_state]
             self.t += 1
-            self.next_state = self.sampler.sample(self.sample_flag+1)
+            self.next_state,self.watermarking = self.sampler.sample(self.sample_flag+1)
             self.sample_flag += 1
             # self.next_state = self.state + action
-            self.ref_points = self.sampler.sample(self.sample_flag+1)
+            self.ref_points,self.watermarking = self.sampler.sample(self.sample_flag+1)
             self.reward = self.compute_reward()
             self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
@@ -99,7 +99,7 @@ class Pythwatermarking(PythBaseEnv):
             self.t += 1
             self.next_state = self.state + action
             self.sample_flag +=1
-            self.ref_points = self.sampler.sample(self.sample_flag+1)
+            self.ref_points,self.watermarking = self.sampler.sample(self.sample_flag+1)
             self.reward = self.compute_reward()
             self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
