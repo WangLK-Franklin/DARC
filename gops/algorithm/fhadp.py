@@ -46,7 +46,7 @@ class ApproxContainer(ApprBase):
         self.policy_optimizer = Adam(
             self.policy.parameters(), lr=policy_learning_rate
         )
-        policy_args["obs_dim"]=int((kwargs["dim_obs"]-kwargs["dim_watermarking"])/2+kwargs["dim_watermarking"])
+        policy_args["obs_dim"]=int((kwargs["dim_obs"]-kwargs["dim_watermarking"])/2+kwargs["dim_watermarking"])-1
         policy_args["act_dim"]=kwargs["dim_watermarking"]
         policy_args["act_high_lim"]=np.array([1])
         policy_args["act_low_lim"]=np.array([-1])
@@ -111,10 +111,10 @@ class FHADP(AlgorithmBase):
         return self.tb_info, update_info
 
     def _remote_update(self, update_info: DataDict):
-        for p, grad in zip(self.networks1.policy.parameters(), update_info["grad1"]):
+        for p, grad in zip(self.networks.policy.parameters(), update_info["grad1"]):
             p.grad = grad
         self.networks.policy_optimizer.step()
-        for p, grad in zip(self.networks2.policy.parameters(), update_info["grad2"]):
+        for p, grad in zip(self.networks.policy_d.parameters(), update_info["grad2"]):
             p.grad = grad
         self.networks.policy_optimizer_d.step()
 
@@ -122,10 +122,13 @@ class FHADP(AlgorithmBase):
         start_time = time.time()
         self.networks.policy.zero_grad()
         self.networks.policy_d.zero_grad()
-        loss_policy, loss_info = self._compute_loss_policy(deepcopy(data))
-        loss_policy.backward()
+        loss_policy, loss_info, generate_data = self._compute_loss_policy(deepcopy(data))
+        loss_d, loss_info_d = self._compute_loss_discriminator(generate_data)
+        loss = loss_policy + loss_d
+        loss.backward()
         end_time = time.time()
         self.tb_info.update(loss_info)
+        self.tb_info.update(loss_info_d)
         self.tb_info[tb_tags["alg_time"]] = (end_time - start_time) * 1000  # ms
 
     def _compute_loss_policy(self, data: DataDict) -> Tuple[torch.Tensor, InfoDict]:
@@ -146,21 +149,38 @@ class FHADP(AlgorithmBase):
             v_pi += r * (self.gamma ** step)
             # TODO: chaifen
             o_list.append(o)
-        for step in range(int(self.pre_horizon)):
-            input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
-            a_d = self.networks.policy_d(input,step + 1)
-            a_d = torch.tanh(a_d)
-            u = w_zero + a_d
-            r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
-            w_zero = u
-            v_d += r_d * (self.gamma ** step)
+        
+        
+        # for step in range(int(self.pre_horizon)):
+        #     input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
+        #     a_d = self.networks.policy_d(input,step + 1)
+        #     a_d = torch.tanh(a_d)
+        #     u = w_zero + a_d
+        #     r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
+        #     w_zero = u
+        #     v_d += r_d * (self.gamma ** step)
 
         loss_actor = -v_pi.mean()
-        loss_discriminator = -v_d.mean()
-        loss_policy = loss_actor + loss_discriminator
-        # loss_policy = -v_pi.mean()
+        # loss_discriminator = -v_d.mean()
+        # loss_policy = loss_actor + loss_discriminator
+        loss_policy = -v_pi.mean()
         loss_info = {
             tb_tags["loss_actor"]: loss_actor.item(),
+            # tb_tags["loss_discriminator"]: loss_discriminator.item()
+        }
+        return loss_policy, loss_info, o_list
+
+    def _compute_loss_discriminator(self, data: list) -> Tuple[torch.Tensor, InfoDict]:
+        v_d=0
+        for o in data:
+            v_d=0
+            input  = o[:,0:self.envmodel.dim_state]
+            a_d = self.networks.policy_d(input)
+            r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),a_d)
+            v_d = r_d+v_d
+        loss_discriminator = -v_d.mean()
+        loss_info = {
+
             tb_tags["loss_discriminator"]: loss_discriminator.item()
         }
-        return loss_policy, loss_info
+        return loss_discriminator, loss_info

@@ -73,8 +73,7 @@ class PythwatermarkingModel(PythBaseEnv):
     
         
     def compute_reward(self, obs, trajectory):
-        distance = F.pairwise_distance(obs, trajectory)
-        
+        distance = F.pairwise_distance(obs, trajectory)        
         return -distance
     
     def judge_done(self):
