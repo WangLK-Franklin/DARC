@@ -31,7 +31,7 @@ class Pythwatermarking(PythBaseEnv):
         self.noise = 0.0
         self.dt = 1
         self.max_episode_steps = kwargs.pop("horizon", 200)
-        self.sampler = WatermarkingSamlper()
+        self.sampler = WatermarkingSamlper(kwargs)
         self.mode = kwargs["mode"]
         self.max_length=self.sampler.max_len
         self.observation_space = spaces.Box(

@@ -34,7 +34,7 @@ class PythwatermarkingModel(PythBaseEnv):
         self.action_upper_bound = torch.tensor(np.full(self.dim_state, 1))
         self.obs_lower_bound=torch.tensor(self.obs_lower_bound)
         self.obs_upper_bound=torch.tensor(self.obs_upper_bound)
-        self.sampler = WatermarkingSamlper()    
+        self.sampler = WatermarkingSamlper(kwargs)    
         super().__init__(
             work_space=self.work_space,
             device=device,

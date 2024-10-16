@@ -23,6 +23,8 @@ if __name__ == "__main__":
     parser.add_argument("--env_id", type=str, default="pyth_watermarking", help="id of environment")
     parser.add_argument("--dim_watermarking", type=int, default="1", help="dim of watermarking")
     parser.add_argument("--dim_obs", type=int, default="11", help="dim of watermarking")
+    parser.add_argument("--watermarking_type", type=str, default="random", help="Options: random/fixed")
+    parser.add_argument("--fix_watermarking", type=list, default=[0.5])
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--pre_horizon", type=int, default=20)
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
