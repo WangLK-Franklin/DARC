@@ -46,10 +46,13 @@ class ApproxContainer(ApprBase):
         self.policy_optimizer = Adam(
             self.policy.parameters(), lr=policy_learning_rate
         )
-        policy_args["obs_dim"]=int((kwargs["dim_obs"]-kwargs["dim_watermarking"])/2+kwargs["dim_watermarking"])-1
+        policy_args["apprfunc"] = "RNN"
+        policy_args["name"]= "FiniteHorizonPolicy"
+        policy_args["obs_dim"]=int((kwargs["dim_obs"]-kwargs["dim_watermarking"])/2+kwargs["dim_watermarking"])
         policy_args["act_dim"]=kwargs["dim_watermarking"]
         policy_args["act_high_lim"]=np.array([1])
         policy_args["act_low_lim"]=np.array([-1])
+   
         self.policy_d = create_apprfunc(**{**policy_args})
         self.policy_optimizer_d = Adam(
             self.policy_d.parameters(), lr=policy_learning_rate
@@ -89,6 +92,7 @@ class FHADP(AlgorithmBase):
         self.gamma = gamma
         self.tb_info = dict()
         self.batch_size = kwargs.get("--replay_batch_size",64)
+        self.hidden_dim = kwargs["policy_hidden_sizes"][0]
 
     @property
     def adjustable_parameters(self) -> Tuple[str]:
@@ -147,18 +151,12 @@ class FHADP(AlgorithmBase):
             a = self.networks.policy(o, step + 1)
             o, r, d, info = self.envmodel.forward(o, a, d, info)
             v_pi += r * (self.gamma ** step)
-            # TODO: chaifen
+
             o_list.append(o)
         
+        staked_o = torch.stack(o_list)
         
-        # for step in range(int(self.pre_horizon)):
-        #     input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
-        #     a_d = self.networks.policy_d(input,step + 1)
-        #     a_d = torch.tanh(a_d)
-        #     u = w_zero + a_d
-        #     r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
-        #     w_zero = u
-        #     v_d += r_d * (self.gamma ** step)
+
 
         loss_actor = -v_pi.mean()
         # loss_discriminator = -v_d.mean()
@@ -168,19 +166,29 @@ class FHADP(AlgorithmBase):
             tb_tags["loss_actor"]: loss_actor.item(),
             # tb_tags["loss_discriminator"]: loss_discriminator.item()
         }
-        return loss_policy, loss_info, o_list
+        return loss_policy, loss_info, staked_o
 
-    def _compute_loss_discriminator(self, data: list) -> Tuple[torch.Tensor, InfoDict]:
+    def _compute_loss_discriminator(self, data: torch.tensor) -> Tuple[torch.Tensor, InfoDict]:
+        # for step in range(int(self.pre_horizon)):
+        #     input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
+        #     a_d = self.networks.policy_d(input,step + 1)
+        #     a_d = torch.tanh(a_d)
+        #     u = w_zero + a_d
+        #     r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
+        #     w_zero = u
+        #     v_d += r_d * (self.gamma ** step)
         v_d=0
-        for o in data:
-            v_d=0
-            input  = o[:,0:self.envmodel.dim_state]
-            a_d = self.networks.policy_d(input)
-            r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),a_d)
-            v_d = r_d+v_d
-        loss_discriminator = -v_d.mean()
+        a0 = torch.zeros((self.batch_size,1))
+        hidden_state = (torch.zeros(1,self.batch_size, self.hidden_dim), torch.zeros(1,self.batch_size, self.hidden_dim))
+        for step in range(int(self.pre_horizon)):
+        
+            input  = torch.cat((data[step][:,0:self.envmodel.dim_state], a0),dim=1).unsqueeze(1)
+            a_d,hidden_state = self.networks.policy_d(input,hidden_state)
+            a0 = torch.tanh(a_d)
+            
+        r_d = self.envmodel.compute_reward(data[:,:,self.envmodel.dim_state*2: ].detach(),a0)
+        loss_discriminator = r_d.mean()
         loss_info = {
-
             tb_tags["loss_discriminator"]: loss_discriminator.item()
         }
         return loss_discriminator, loss_info

@@ -50,7 +50,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--policy_act_distribution", type=str, default="default")
     policy_func_type = parser.parse_known_args()[0].policy_func_type
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[512, 1024, 512, 256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 512, 256])
     parser.add_argument("--policy_hidden_activation", type=str, default="elu")
     
     parser.add_argument("--mode", type=str, default="train")

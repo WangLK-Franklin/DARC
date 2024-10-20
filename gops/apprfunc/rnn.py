@@ -70,8 +70,29 @@ class FiniteHorizonPolicy(nn.Module, Action_Distribution):
     """
 
     def __init__(self, **kwargs):
-        raise NotImplementedError
+        super().__init__()
+        obs_dim = kwargs["obs_dim"]
+        act_dim = kwargs["act_dim"]
+        action_high_limit = kwargs["act_high_lim"]
+        action_low_limit = kwargs["act_low_lim"]
+        hidden_sizes = kwargs["hidden_sizes"]
+        pi_sizes = list(hidden_sizes) + [act_dim]
+        self.rnn = nn.LSTM(obs_dim, hidden_sizes[0], batch_first=True)
+        self.pi = mlp(
+            pi_sizes,
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["output_activation"]),
+        )
+        self.register_buffer("act_high_lim", torch.from_numpy(action_high_limit))
+        self.register_buffer("act_low_lim", torch.from_numpy(action_low_limit))
 
+
+    def forward(self, obs,hidden_state):
+        action, h = self.rnn(obs,hidden_state)
+        action = (self.act_high_lim - self.act_low_lim) / 2 * torch.tanh(
+            self.pi(action[:, -1, :].squeeze(0))
+        ) + (self.act_high_lim + self.act_low_lim) / 2
+        return action, h
 
 class StochaPolicy(nn.Module, Action_Distribution):
     """

@@ -64,7 +64,7 @@ class Evaluator:
             action = action.detach().numpy()[0]
 
             next_obs, reward, done, next_info = self.env.step(action)
-            print("next_obs", next_obs) 
+            # print("next_obs", next_obs) 
             # print("reward", reward)
             obs_list.append(obs[-1])
             action_list.append(action)

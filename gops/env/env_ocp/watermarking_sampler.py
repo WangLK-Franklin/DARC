@@ -8,7 +8,7 @@ class WatermarkingSamlper:
         path =  "/home/wanglikun/data-watermarking/data/idc_controler_2024-6-6_16-2-36_default.csv"
         self.watermarking_mode = kwargs["watermarking_type"]
         if self.watermarking_mode == "random":
-            self.watermarking = np.random.rand(kwargs["dim_watermarking"])
+            self.watermarking = np.random.rand(int(kwargs["dim_watermarking"]))
         else:
             self.watermarking = kwargs["fix_watermarking"]
         self.data = pd.read_csv(path)

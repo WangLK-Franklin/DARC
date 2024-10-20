@@ -23,8 +23,8 @@ class PythwatermarkingModel(PythBaseEnv):
         **kwargs,
         ):
         self.max_episode_steps = pre_horizon
-        self.dim_obs = kwargs.pop("dim_obs", 11)
-        self.dim_watermarking =kwargs.pop("dim_watermarking", 1) 
+        self.dim_obs = kwargs["dim_obs"]
+        self.dim_watermarking =kwargs["dim_watermarking"] 
         self.noise_flag = kwargs.pop("noise_flag", False)
         self.dim_state = int((self.dim_obs-self.dim_watermarking)/2)
         self.obs_lower_bound=np.full(self.dim_obs, -10000)
@@ -34,7 +34,7 @@ class PythwatermarkingModel(PythBaseEnv):
         self.action_upper_bound = torch.tensor(np.full(self.dim_state, 1))
         self.obs_lower_bound=torch.tensor(self.obs_lower_bound)
         self.obs_upper_bound=torch.tensor(self.obs_upper_bound)
-        self.sampler = WatermarkingSamlper(kwargs)    
+        self.sampler = WatermarkingSamlper(**kwargs)    
         super().__init__(
             work_space=self.work_space,
             device=device,
