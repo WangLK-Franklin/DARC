@@ -26,7 +26,8 @@ class PythwatermarkingModel(PythBaseEnv):
         self.dim_obs = kwargs["dim_obs"]
         self.dim_watermarking =kwargs["dim_watermarking"] 
         self.noise_flag = kwargs.pop("noise_flag", False)
-        self.dim_state = int((self.dim_obs-self.dim_watermarking)/2)
+        self.num_refs = kwargs["num_refs"]
+        self.dim_state = int((self.dim_obs-self.dim_watermarking)/(self.num_refs+1))
         self.obs_lower_bound=np.full(self.dim_obs, -10000)
         self.obs_upper_bound=np.full(self.dim_obs, 10000)
         self.work_space = torch.tensor([self.obs_lower_bound, self.obs_upper_bound])
@@ -59,7 +60,10 @@ class PythwatermarkingModel(PythBaseEnv):
 
         isdone = self.judge_done()  
         # next_obs = torch.cat((next_state,self.sampler.tensor_sample(sampler+1)),dim=1)
-        next_obs = torch.cat([next_state, self.sampler.tensor_sample(self.sample_flag+1), obs[:,self.dim_state*2:]], dim=1)
+        for i in range(self.num_refs):
+            next_ref = self.sampler.tensor_sample(self.sample_flag+1+i)
+            next_state = torch.cat([next_state, next_ref], dim=1)
+        next_obs = torch.cat([next_state, obs[:,self.dim_state*(self.num_refs+1):]], dim=1)
         # next_obs = torch.cat([next_state, self.sampler.tensor_sample(self.sample_flag+1)], dim=1)
         next_info = {}
         for key, value in info.items():
@@ -77,7 +81,7 @@ class PythwatermarkingModel(PythBaseEnv):
         return -distance
     
     def judge_done(self):
-        done = (self.sample_flag>=self.sampler.max_len-2)
+        done = (self.sample_flag>=self.sampler.max_len-7)
         return done
 
 

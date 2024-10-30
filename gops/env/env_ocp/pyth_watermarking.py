@@ -21,11 +21,12 @@ class Pythwatermarking(PythBaseEnv):
         self.max_episode_steps= kwargs.pop("max_episode_steps", 200)
         if work_space is None:
             # initial range of [delta_y, delta_phi, v, w]
-            init_high = np.full(shape=self.dim_obs,fill_value=-10000, dtype=np.float32)
+            init_high = np.full(shape=self.dim_obs,fill_value=1, dtype=np.float32)
             init_low = -init_high
             work_space = np.stack((init_low, init_high))
+        self.num_refs = kwargs["num_refs"]
         super(Pythwatermarking, self).__init__(work_space=work_space, **kwargs)
-        self.dim_state = int((self.dim_obs-self.dim_watermarking)/2)
+        self.dim_state = int((self.dim_obs-self.dim_watermarking)/(self.num_refs+1))
         self.sample_flag = 0
         
         self.noise = 0.0
@@ -33,6 +34,7 @@ class Pythwatermarking(PythBaseEnv):
         self.max_episode_steps = kwargs.pop("horizon", 200)
         self.sampler = WatermarkingSamlper(**kwargs)
         self.mode = kwargs["mode"]
+
         self.max_length=self.sampler.max_len
         self.observation_space = spaces.Box(
             low=np.array([-np.inf] * (self.dim_obs)),
@@ -44,11 +46,12 @@ class Pythwatermarking(PythBaseEnv):
             high=np.full(shape=self.dim_state,fill_value=1, dtype=np.float32), 
             dtype=np.float32
         )
-        # self.watermarking = self.watermarking_generator()
+        
+        self.watermarking = self.sampler.watermarking
         self.t = 0
         self.sample_flag = 0
-        self.state,self.watermarking = self.sampler.sample(0)
-        self.ref_points,_ = self.sampler.sample(1)
+        self.state = self.sampler.sample(0)
+        self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
         self.done = None
         self.seed()
@@ -68,11 +71,12 @@ class Pythwatermarking(PythBaseEnv):
     
     def reset(self, **kwargs):
         self.sample_flag = random.randint(0, self.max_length-self.max_episode_steps-1)
-        self.state,self.watermarking = self.sampler.sample(self.sample_flag)
-        self.ref_points,_ = self.sampler.sample(self.sample_flag+1)
+        self.state = self.sampler.sample(self.sample_flag)
+        self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
         self.t = 0
         self.done = False
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
+        # self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
         # self.obs = np.concatenate([self.state, self.ref_points])
         info = {"state": self.obs,
                 "ref_time": self.t,
@@ -85,12 +89,13 @@ class Pythwatermarking(PythBaseEnv):
             self.action = action
             self.state = self.obs[:self.dim_state]
             self.t += 1
-            self.next_state,self.watermarking = self.sampler.sample(self.sample_flag+1)
+            self.next_state = self.sampler.sample(self.sample_flag+1)
             self.sample_flag += 1
             # self.next_state = self.state + action
-            self.ref_points,self.watermarking = self.sampler.sample(self.sample_flag+1)
+            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
+
             self.reward = self.compute_reward()
-            self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
+            self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
             self.done = self.judge_train_done()
         else:
@@ -99,7 +104,8 @@ class Pythwatermarking(PythBaseEnv):
             self.t += 1
             self.next_state = self.state + action
             self.sample_flag +=1
-            self.ref_points,self.watermarking = self.sampler.sample(self.sample_flag+1)
+            self.ref_points, _ = [self.sampler.sample(self.sample_flag+i+1) for i in range(self.num_refs)]
+            _, self.watermarking = self.sampler.sample(self.sample_flag+1)
             self.reward = self.compute_reward()
             self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
@@ -118,7 +124,7 @@ class Pythwatermarking(PythBaseEnv):
         # return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
         return (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)
     def judge_eval_done(self):
-        return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
+        return  (self.sample_flag >= self.max_length-self.max_episode_steps-6)
         # return  (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)
 
     

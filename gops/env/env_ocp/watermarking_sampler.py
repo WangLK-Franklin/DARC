@@ -26,7 +26,9 @@ class WatermarkingSamlper:
         #     self.watermarking = 0.4
         #     else:
         #     self.watermarking = 0.6
-        return self.data[sample_flag],self.watermarking
+        # return self.data[sample_flag],self.watermarking
+        return self.data[sample_flag]
+    
     def tensor_sample(self,sample_flag:torch.Tensor) -> torch.Tensor:
         sample_flag = sample_flag.tolist()
         slices = [int(x) for x in sample_flag]
