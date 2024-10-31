@@ -104,8 +104,8 @@ class Pythwatermarking(PythBaseEnv):
             self.t += 1
             self.next_state = self.state + action
             self.sample_flag +=1
-            self.ref_points, _ = [self.sampler.sample(self.sample_flag+i+1) for i in range(self.num_refs)]
-            _, self.watermarking = self.sampler.sample(self.sample_flag+1)
+            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
+
             self.reward = self.compute_reward()
             self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
