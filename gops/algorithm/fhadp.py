@@ -46,8 +46,8 @@ class ApproxContainer(ApprBase):
         self.policy_optimizer = Adam(
             self.policy.parameters(), lr=policy_learning_rate
         )
-        policy_args["apprfunc"] = "RNN"
-        policy_args["name"]= "FiniteHorizonPolicy"
+        # policy_args["apprfunc"] = "RNN"
+        # policy_args["name"]= "FiniteHorizonPolicy"
         policy_args["obs_dim"]=int((kwargs["dim_obs"]-kwargs["dim_watermarking"])/(kwargs["num_refs"]+1)+kwargs["dim_watermarking"])
         policy_args["act_dim"]=kwargs["dim_watermarking"]
         policy_args["act_high_lim"]=np.array([1])
@@ -144,7 +144,7 @@ class FHADP(AlgorithmBase):
         # w = data["watermarking"]
         v_pi = 0
         v_d = 0 
-        o_list.append(o)
+        
         shape_tensor = torch.zeros((self.batch_size,self.envmodel.dim_watermarking))
         w_zero = torch.zeros(size=shape_tensor.shape)
         for step in range(self.pre_horizon):
@@ -168,27 +168,48 @@ class FHADP(AlgorithmBase):
         }
         return loss_policy, loss_info, staked_o
 
-    def _compute_loss_discriminator(self, data: torch.tensor) -> Tuple[torch.Tensor, InfoDict]:
-        # for step in range(int(self.pre_horizon)):
-        #     input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
-        #     a_d = self.networks.policy_d(input,step + 1)
-        #     a_d = torch.tanh(a_d)
-        #     u = w_zero + a_d
-        #     r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
-        #     w_zero = u
-        #     v_d += r_d * (self.gamma ** step)
-        v_d=0
-        a0 = torch.zeros((self.batch_size,self.envmodel.dim_watermarking))
-        hidden_state = (torch.zeros(1,self.batch_size, self.hidden_dim), torch.zeros(1,self.batch_size, self.hidden_dim))
-        for step in range(int(self.pre_horizon)):
+    # def _compute_loss_discriminator(self, data: torch.tensor) -> Tuple[torch.Tensor, InfoDict]:
+    #     # for step in range(int(self.pre_horizon)):
+    #     #     input  = torch.cat((o_list[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
+    #     #     a_d = self.networks.policy_d(input,step + 1)
+    #     #     a_d = torch.tanh(a_d)
+    #     #     u = w_zero + a_d
+    #     #     r_d = self.envmodel.compute_reward(o[:,self.envmodel.dim_state*2: ].detach(),u)
+    #     #     w_zero = u
+    #     #     v_d += r_d * (self.gamma ** step)
+    #     v_d=0
+    #     a0 = torch.zeros((self.batch_size,self.envmodel.dim_watermarking))
+    #     hidden_state = (torch.zeros(1,self.batch_size, self.hidden_dim), torch.zeros(1,self.batch_size, self.hidden_dim))
+    #     for step in range(int(self.pre_horizon)):
         
-            input  = torch.cat((data[step][:,0:self.envmodel.dim_state], a0),dim=1).unsqueeze(1)
-            a_d,hidden_state = self.networks.policy_d(input,hidden_state)
-            a0 = torch.tanh(a_d)
+    #         input  = torch.cat((data[step][:,0:self.envmodel.dim_state], a0),dim=1).unsqueeze(1)
+    #         a_d,hidden_state = self.networks.policy_d(input,hidden_state)
+    #         a0 = torch.tanh(a_d)
             
-        r_d = self.envmodel.compute_reward(data[:,:,self.envmodel.dim_state*(self.envmodel.num_refs+1): ].detach(),a0)
+    #     r_d = self.envmodel.compute_discriminator_reward(data[-1,:,self.envmodel.dim_state*(self.envmodel.num_refs+1): ].detach(),a0)
+    #     loss_discriminator = r_d.mean()
+    #     loss_info = {
+    #         tb_tags["loss_discriminator"]: loss_discriminator.item()
+    #     }
+    #     return loss_discriminator, loss_info
+    def _compute_loss_discriminator(self, data: torch.tensor) -> Tuple[torch.Tensor, InfoDict]:
+        w_zero = torch.zeros((self.batch_size,self.envmodel.dim_watermarking))
+        v_d=0
+        for step in range(int(self.pre_horizon)):
+            input  = torch.cat((data[step][:,0:self.envmodel.dim_state], w_zero),dim=1)
+            a_d = self.networks.policy_d(input,step + 1)
+            a_d = torch.tanh(a_d)
+            u = w_zero + a_d
+            r_d = self.envmodel.compute_reward(data[step][:,self.envmodel.dim_state*(self.envmodel.num_refs+1): ].detach(),u)
+            w_zero = u
+            v_d += r_d * (self.gamma ** step)
+        
         loss_discriminator = r_d.mean()
         loss_info = {
-            tb_tags["loss_discriminator"]: loss_discriminator.item()
-        }
+             tb_tags["loss_discriminator"]: loss_discriminator.item()
+         }
         return loss_discriminator, loss_info
+    
+    
+    
+    

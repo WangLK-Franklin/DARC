@@ -76,9 +76,18 @@ class PythwatermarkingModel(PythBaseEnv):
         return next_obs, reward, isdone, next_info
     
         
-    def compute_reward(self, obs, trajectory):
-        distance = F.pairwise_distance(obs, trajectory)        
-        return -distance
+    def compute_reward(self, obs: torch.Tensor, trajectory: torch.Tensor):
+        calculated_obs = obs.clone()
+        calculated_trajectory = trajectory.clone()
+        # weight = torch.Tensor(self.sampler.delta)
+        # weighted_state = (calculated_trajectory - calculated_obs) * weight
+        weighted_state = (calculated_trajectory - calculated_obs)
+        distance = -torch.norm(weighted_state, p=1, dim=1)  
+        return distance
+    
+    def compute_discriminator_reward(self, obs: torch.Tensor, trajectory: torch.Tensor):
+        distance = -torch.norm(obs-trajectory, p=2, dim=1)  
+        return distance
     
     def judge_done(self):
         done = (self.sample_flag>=self.sampler.max_len-7)

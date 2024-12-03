@@ -18,7 +18,7 @@ class Pythwatermarking(PythBaseEnv):
         self.dim_watermarking = kwargs["dim_watermarking"]
         self.dim_obs = kwargs.pop("dim_obs", 11)
         self.noise_flag = kwargs.pop("noise_flag", False)
-        self.max_episode_steps= kwargs.pop("max_episode_steps", 200)
+        self.max_episode_steps= kwargs.pop("max_episode_steps", 20)
         if work_space is None:
             # initial range of [delta_y, delta_phi, v, w]
             init_high = np.full(shape=self.dim_obs,fill_value=1, dtype=np.float32)
@@ -31,7 +31,7 @@ class Pythwatermarking(PythBaseEnv):
         
         self.noise = 0.0
         self.dt = 1
-        self.max_episode_steps = kwargs.pop("horizon", 200)
+        self.max_episode_steps = kwargs.pop("horizon", 50)
         self.sampler = WatermarkingSamlper(**kwargs)
         self.mode = kwargs["mode"]
 
@@ -51,7 +51,7 @@ class Pythwatermarking(PythBaseEnv):
         self.t = 0
         self.sample_flag = 0
         self.state = self.sampler.sample(0)
-        self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
+        self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
         self.done = None
         self.seed()
@@ -67,12 +67,18 @@ class Pythwatermarking(PythBaseEnv):
         return additional_info
     
     def watermarking_generator(self):
+    
         return np.random.rand(self.dim_watermarking)
     
     def reset(self, **kwargs):
-        self.sample_flag = random.randint(0, self.max_length-self.max_episode_steps-1)
-        self.state = self.sampler.sample(self.sample_flag)
-        self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
+        if kwargs.get("init_state") is not None:
+            self.sample_flag = int(kwargs.get("init_flag"))
+            self.state = np.array(kwargs.get("init_state"))
+            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
+        else:
+            self.sample_flag = random.randint(0, self.max_length-self.max_episode_steps-1)
+            self.state = self.sampler.sample(self.sample_flag)
+            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
         self.t = 0
         self.done = False
         self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
@@ -92,7 +98,7 @@ class Pythwatermarking(PythBaseEnv):
             self.next_state = self.sampler.sample(self.sample_flag+1)
             self.sample_flag += 1
             # self.next_state = self.state + action
-            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
+            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
 
             self.reward = self.compute_reward()
             self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
@@ -104,7 +110,7 @@ class Pythwatermarking(PythBaseEnv):
             self.t += 1
             self.next_state = self.state + action
             self.sample_flag +=1
-            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,5*self.num_refs).squeeze(0)
+            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
 
             self.reward = self.compute_reward()
             self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
@@ -119,12 +125,15 @@ class Pythwatermarking(PythBaseEnv):
         return self.obs, self.reward, self.done, next_info
         
     def compute_reward(self):
-        return -np.linalg.norm((self.next_state-self.obs[self.dim_state:self.dim_state*2]),2)
+        # weight = self.sampler.delta
+        # weighted_state = (self.next_state-self.obs[self.dim_state:self.dim_state*2])* weight 
+        weighted_state = (self.next_state-self.obs[self.dim_state:self.dim_state*2])      
+        return -np.linalg.norm(weighted_state,1)
     def judge_train_done(self):
         # return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
         return (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)
     def judge_eval_done(self):
-        return  (self.sample_flag >= self.max_length-self.max_episode_steps-6)
+        return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
         # return  (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)
 
     

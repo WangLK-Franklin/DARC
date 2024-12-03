@@ -266,6 +266,7 @@ class StochaPolicy(nn.Module, Action_Distribution):
                 self.log_std(obs), self.min_log_std, self.max_log_std
             ).exp()
         elif self.std_type == "mlp_shared":
+            param_device = next(self.policy.parameters()).device
             logits = self.policy(obs)
             action_mean, action_log_std = torch.chunk(
                 logits, chunks=2, dim=-1

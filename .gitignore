@@ -43,8 +43,8 @@ gops/.idea/*
 !/results/SPIL
 /results/SPIL/*
 !/results/SPIL/mobilerobot
-
-
+/clash/
+/data/
 .idea/*
 **/__pycache__
 *.pyc
@@ -52,6 +52,7 @@ gops/.idea/*
 # C extensions
 *.so
 *.pkl
+*.whl
 
 figures/
 # Distribution / packaging

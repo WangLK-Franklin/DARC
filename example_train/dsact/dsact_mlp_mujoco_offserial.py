@@ -10,7 +10,7 @@
 #  Update Date: 2021-03-05, Wenxuan Wang: create example
 
 import argparse
-
+import os
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
 from gops.create_pkg.create_env import create_env
@@ -20,8 +20,11 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
+import torch
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 
+print(torch.cuda.is_available())
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
