@@ -5,13 +5,22 @@ from torch.distributions import OneHotCategorical, Normal
 from einops import rearrange, repeat, reduce
 from einops.layers.torch import Rearrange
 from torch.cuda.amp import autocast
+from typing import Sequence, Optional
+from weser.functions_losses import SymLogTwoHotLoss
+from weser.attention_blocks import get_subsequent_mask_with_batch_length, get_subsequent_mask
+from weser.transformer_model import StochasticTransformerKVCache
+from gops.trainer.buffer.replay_buffer import ReplayBuffer
 
-from gops.trainer.world_model.weser.functions_losses import SymLogTwoHotLoss
-from gops.trainer.world_model.weser.attention_blocks import get_subsequent_mask_with_batch_length, get_subsequent_mask
-from gops.trainer.world_model.weser.transformer_model import StochasticTransformerKVCache
-
-
-
+def torch_mlp(
+    sizes: Sequence[int],
+    activation: Optional[nn.Module] = None,
+    output_activation: nn.Module = nn.Identity,
+) -> nn.Sequential: 
+    layers = []
+    for i in range(len(sizes) - 1):
+        act = activation if i < len(sizes) - 2 else output_activation
+        layers += [nn.Linear(sizes[i], sizes[i + 1]), act()]
+    return nn.Sequential(*layers)
 class EncoderBN(nn.Module):
     def __init__(self, in_channels, stem_channels, final_feature_width) -> None:
         super().__init__()
@@ -215,7 +224,7 @@ class CategoricalKLDivLossWithFreeBits(nn.Module):
 
 class WorldModel(nn.Module):
     def __init__(self, in_channels, action_dim,
-                 transformer_max_length, transformer_hidden_dim, transformer_num_layers, transformer_num_heads):
+                 transformer_max_length, transformer_hidden_dim, transformer_num_layers, transformer_num_heads,**kwargs):
         super().__init__()
         
         self.transformer_hidden_dim = transformer_hidden_dim
@@ -226,15 +235,17 @@ class WorldModel(nn.Module):
         self.tensor_dtype = torch.bfloat16 if self.use_amp else torch.float32
         self.imagine_batch_size = -1
         self.imagine_batch_length = -1
-
+        self.action_dim = kwargs["action_dim"]
+        self.obs_dim = kwargs["obs_dict"]
         self.encoder = EncoderBN(
             in_channels=in_channels,
             stem_channels=32,
             final_feature_width=self.final_feature_width
         )
+        
         self.storm_transformer = StochasticTransformerKVCache(
             stoch_dim=self.stoch_flattened_dim,
-            action_dim=action_dim,
+            action_dim=self.action_dim,
             feat_dim=transformer_hidden_dim,
             num_layers=transformer_num_layers,
             num_heads=transformer_num_heads,
@@ -262,7 +273,7 @@ class WorldModel(nn.Module):
             embedding_size=self.stoch_flattened_dim,
             transformer_hidden_dim=transformer_hidden_dim
         )
-
+        self.kwargs = kwargs
         self.mse_loss_func = MSELoss()
         self.ce_loss = nn.CrossEntropyLoss()
         self.bce_with_logits_loss_func = nn.BCEWithLogitsLoss()
@@ -270,7 +281,13 @@ class WorldModel(nn.Module):
         self.categorical_kl_div_loss = CategoricalKLDivLossWithFreeBits(free_bits=1)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         self.scaler = torch.amp.GradScaler('cuda', enabled=self.use_amp)
-
+        self.embedding_dim = 1024
+        
+        self.ego_state_projector = torch_mlp(
+            [self.obs_dict["ego"], self.embedding_dim],
+            activation=None,
+            output_activation=nn.ReLU)
+        
     def encode_obs(self, obs):
         with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
             embedding = self.encoder(obs)
@@ -289,24 +306,21 @@ class WorldModel(nn.Module):
             prior_flattened_sample = self.flatten_sample(prior_sample)
         return prior_flattened_sample, last_dist_feat
 
-    def predict_next(self, last_flattened_sample, action, log_video=True):
+    def predict_next(self, state, action):
         with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
-            dist_feat = self.storm_transformer.forward_with_kv_cache(last_flattened_sample, action)
+            dist_feat = self.storm_transformer.forward_with_kv_cache(state, action)
             prior_logits = self.dist_head.forward_prior(dist_feat)
 
             # decoding
             prior_sample = self.stright_throught_gradient(prior_logits, sample_mode="random_sample")
             prior_flattened_sample = self.flatten_sample(prior_sample)
-            if log_video:
-                obs_hat = self.image_decoder(prior_flattened_sample)
-            else:
-                obs_hat = None
+            
             reward_hat = self.reward_decoder(dist_feat)
             reward_hat = self.symlog_twohot_loss_func.decode(reward_hat)
             termination_hat = self.termination_decoder(dist_feat)
             termination_hat = termination_hat > 0
 
-        return obs_hat, reward_hat, termination_hat, prior_flattened_sample, dist_feat
+        return reward_hat, termination_hat, prior_flattened_sample, dist_feat
 
     def stright_throught_gradient(self, logits, sample_mode="random_sample"):
         dist = OneHotCategorical(logits=logits)
@@ -321,91 +335,77 @@ class WorldModel(nn.Module):
     def flatten_sample(self, sample):
         return rearrange(sample, "B L K C -> B L (K C)")
 
-    def init_imagine_buffer(self, imagine_batch_size, imagine_batch_length, dtype):
+    def init_imagine_buffer(self, imagine_batch_size,dtype):
         '''
         This can slightly improve the efficiency of imagine_data
         But may vary across different machines
         '''
-        if self.imagine_batch_size != imagine_batch_size or self.imagine_batch_length != imagine_batch_length:
-            print(f"init_imagine_buffer: {imagine_batch_size}x{imagine_batch_length}@{dtype}")
-            self.imagine_batch_size = imagine_batch_size
-            self.imagine_batch_length = imagine_batch_length
-            latent_size = (imagine_batch_size, imagine_batch_length+1, self.stoch_flattened_dim)
-            hidden_size = (imagine_batch_size, imagine_batch_length+1, self.transformer_hidden_dim)
-            scalar_size = (imagine_batch_size, imagine_batch_length)
-            self.latent_buffer = torch.zeros(latent_size, dtype=dtype, device="cuda")
-            self.hidden_buffer = torch.zeros(hidden_size, dtype=dtype, device="cuda")
-            self.action_buffer = torch.zeros(scalar_size, dtype=dtype, device="cuda")
-            self.reward_hat_buffer = torch.zeros(scalar_size, dtype=dtype, device="cuda")
-            self.termination_hat_buffer = torch.zeros(scalar_size, dtype=dtype, device="cuda")
-
-    def imagine_data(self, agent, sample_obs, sample_action,
-                     imagine_batch_size, imagine_batch_length, log_video, logger):
-        self.init_imagine_buffer(imagine_batch_size, imagine_batch_length, dtype=self.tensor_dtype)
+        self.imagine_batch_size = imagine_batch_size
+        self.replayer = ReplayBuffer(dtype=dtype, **self.kwargs)
+         
+    def imagine_data(self, sample_obs, sample_action,imagine_batch_size):
+        self.init_imagine_buffer(imagine_batch_size, dtype=self.tensor_dtype)
         obs_hat_list = []
 
         self.storm_transformer.reset_kv_cache_list(imagine_batch_size, dtype=self.tensor_dtype)
         # context
-        context_latent = self.encode_obs(sample_obs)
-        for i in range(sample_obs.shape[1]):  # context_length is sample_obs.shape[1]
-            last_obs_hat, last_reward_hat, last_termination_hat, last_latent, last_dist_feat = self.predict_next(
-                context_latent[:, i:i+1],
-                sample_action[:, i:i+1],
-                log_video=log_video
-            )
-        self.latent_buffer[:, 0:1] = last_latent
-        self.hidden_buffer[:, 0:1] = last_dist_feat
+        pro_obs = self.encoder(sample_obs)
+        # context_length is sample_obs.shape[1]
+        next_obs, reward, termination = self.predict_next(
+                pro_obs,
+                sample_action,
+        )
+        self.replayer.store(
+            obs=sample_obs,
+            action=sample_action,
+            reward=reward,
+            termination=termination,
+            next_obs=next_obs,
+            info={},
+            next_info={},
+            logp=None
+        )
+        
+        return self.replayer.buf["obs"], self.replayer.buf["act"], self.replayer.buf["rew"], self.replayer.buf["done"]
 
-        # imagine
-        for i in range(imagine_batch_length):
-            action = agent.sample(torch.cat([self.latent_buffer[:, i:i+1], self.hidden_buffer[:, i:i+1]], dim=-1))
-            self.action_buffer[:, i:i+1] = action
+    def update(self, obs, action, reward, termination, next_obs, logger=None):
+        # obs: B L S
+        # action: B L A
+        # reward: B L
+        # termination: B L
+        obs = obs.unsqueeze(1)
+        action = action.unsqueeze(1)
+        reward = reward.unsqueeze(1)
+        termination = termination.unsqueeze(1)
 
-            last_obs_hat, last_reward_hat, last_termination_hat, last_latent, last_dist_feat = self.predict_next(
-                self.latent_buffer[:, i:i+1], self.action_buffer[:, i:i+1], log_video=log_video)
-
-            self.latent_buffer[:, i+1:i+2] = last_latent
-            self.hidden_buffer[:, i+1:i+2] = last_dist_feat
-            self.reward_hat_buffer[:, i:i+1] = last_reward_hat
-            self.termination_hat_buffer[:, i:i+1] = last_termination_hat
-            if log_video:
-                obs_hat_list.append(last_obs_hat[::imagine_batch_size//16])  # uniform sample vec_env
-
-        if log_video:
-            logger.log("Imagine/predict_video", torch.clamp(torch.cat(obs_hat_list, dim=1), 0, 1).cpu().float().detach().numpy())
-
-        return torch.cat([self.latent_buffer, self.hidden_buffer], dim=-1), self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
-
-    def update(self, obs, action, reward, termination, logger=None):
         self.train()
+        
         batch_size, batch_length = obs.shape[:2]
 
         with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
             # encoding
-            embedding = self.encoder(obs)
-            post_logits = self.dist_head.forward_post(embedding)
-            sample = self.stright_throught_gradient(post_logits, sample_mode="random_sample")
-            flattened_sample = self.flatten_sample(sample)
+            # embedding = self.encoder(obs)
+            # post_logits = self.dist_head.forward_post(embedding)
+            # sample = self.stright_throught_gradient(post_logits, sample_mode="random_sample")
+            # flattened_sample = self.flatten_sample(sample)
 
-            # decoding image
-            obs_hat = self.image_decoder(flattened_sample)
-
+            # # decoding image
+            # obs_hat = self.image_decoder(flattened_sample)
+            flattened_sample = self.ego_state_projector(obs)
             # transformer
             temporal_mask = get_subsequent_mask_with_batch_length(batch_length, flattened_sample.device)
             dist_feat = self.storm_transformer(flattened_sample, action, temporal_mask)
-            prior_logits = self.dist_head.forward_prior(dist_feat)
+            pre_next_obs = self.dist_head.forward_prior(dist_feat)
             # decoding reward and termination with dist_feat
             reward_hat = self.reward_decoder(dist_feat)
             termination_hat = self.termination_decoder(dist_feat)
 
             # env loss
-            reconstruction_loss = self.mse_loss_func(obs_hat, obs)
+            reconstruction_loss = self.mse_loss_func(next_obs, pre_next_obs)
             reward_loss = self.symlog_twohot_loss_func(reward_hat, reward)
             termination_loss = self.bce_with_logits_loss_func(termination_hat, termination)
             # dyn-rep loss
-            dynamics_loss, dynamics_real_kl_div = self.categorical_kl_div_loss(post_logits[:, 1:].detach(), prior_logits[:, :-1])
-            representation_loss, representation_real_kl_div = self.categorical_kl_div_loss(post_logits[:, 1:], prior_logits[:, :-1].detach())
-            total_loss = reconstruction_loss + reward_loss + termination_loss + 0.5*dynamics_loss + 0.1*representation_loss
+            total_loss = reconstruction_loss + reward_loss + termination_loss 
 
         # gradient descent
         self.scaler.scale(total_loss).backward()
@@ -419,8 +419,4 @@ class WorldModel(nn.Module):
             logger.log("WorldModel/reconstruction_loss", reconstruction_loss.item())
             logger.log("WorldModel/reward_loss", reward_loss.item())
             logger.log("WorldModel/termination_loss", termination_loss.item())
-            logger.log("WorldModel/dynamics_loss", dynamics_loss.item())
-            logger.log("WorldModel/dynamics_real_kl_div", dynamics_real_kl_div.item())
-            logger.log("WorldModel/representation_loss", representation_loss.item())
-            logger.log("WorldModel/representation_real_kl_div", representation_real_kl_div.item())
             logger.log("WorldModel/total_loss", total_loss.item())

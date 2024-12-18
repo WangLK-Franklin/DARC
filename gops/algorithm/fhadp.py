@@ -200,11 +200,11 @@ class FHADP(AlgorithmBase):
             a_d = self.networks.policy_d(input,step + 1)
             a_d = torch.tanh(a_d)
             u = w_zero + a_d
-            r_d = self.envmodel.compute_reward(data[step][:,self.envmodel.dim_state*(self.envmodel.num_refs+1): ].detach(),u)
+            r_d = self.envmodel.compute_discriminator_reward(data[step][:,self.envmodel.dim_state*(self.envmodel.num_refs+1): ].detach(),u)
             w_zero = u
             v_d += r_d * (self.gamma ** step)
         
-        loss_discriminator = r_d.mean()
+        loss_discriminator = -r_d.mean()
         loss_info = {
              tb_tags["loss_discriminator"]: loss_discriminator.item()
          }

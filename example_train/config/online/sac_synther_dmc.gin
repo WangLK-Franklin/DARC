@@ -36,4 +36,4 @@ SimpleDiffusionGenerator.num_sample_steps = 128
 
 #diffusion enabled
 OffSerialWorldTrainer.disable_diffusion=True
-OffSerialWorldTrainer.trainer_type = Diffusion
+OffSerialWorldTrainer.trainer_type = "Diffusion"

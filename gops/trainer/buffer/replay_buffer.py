@@ -29,24 +29,25 @@ class ReplayBuffer:
     Implementation of replay buffer with uniform sampling probability.
     """
 
-    def __init__(self, index=0, **kwargs):
+    def __init__(self, index=0,dtype=np.float32, **kwargs):
         set_seed(kwargs["trainer"], kwargs["seed"], index + 100)
         self.obsv_dim = kwargs["obsv_dim"]
         self.act_dim = kwargs["action_dim"]
         self.max_size = kwargs["buffer_max_size"]
         self.buf = {
             "obs": np.zeros(
-                combined_shape(self.max_size, self.obsv_dim), dtype=np.float32
+                combined_shape(self.max_size, self.obsv_dim), dtype=dtype
             ),
             "obs2": np.zeros(
-                combined_shape(self.max_size, self.obsv_dim), dtype=np.float32
+                combined_shape(self.max_size, self.obsv_dim), dtype=dtype
             ),
             "act": np.zeros(
-                combined_shape(self.max_size, self.act_dim), dtype=np.float32
+                combined_shape(self.max_size, self.act_dim), dtype=dtype
             ),
-            "rew": np.zeros(self.max_size, dtype=np.float32),
-            "done": np.zeros(self.max_size, dtype=np.float32),
-            "logp": np.zeros(self.max_size, dtype=np.float32),
+            "rew": np.zeros(self.max_size, dtype=dtype),
+            "done": np.zeros(self.max_size, dtype=dtype),
+            "logp": np.zeros(self.max_size, dtype=dtype),
+            "priority": np.zeros(self.max_size, dtype=dtype),
         }
         self.additional_info = kwargs["additional_info"]
         for k, v in self.additional_info.items():

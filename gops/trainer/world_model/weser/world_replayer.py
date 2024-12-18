@@ -6,12 +6,21 @@ from einops import rearrange, repeat, reduce
 from einops.layers.torch import Rearrange
 from torch.cuda.amp import autocast
 
-from gops.trainer.world_model.weser.functions_losses import SymLogTwoHotLoss
-from gops.trainer.world_model.weser.attention_blocks import get_subsequent_mask_with_batch_length, get_subsequent_mask
-from gops.trainer.world_model.weser.transformer_model import StochasticTransformerKVCache
+from weser.functions_losses import SymLogTwoHotLoss
+from weser.attention_blocks import get_subsequent_mask_with_batch_length, get_subsequent_mask
+from weser.transformer_model import StochasticTransformerKVCache
+from typing import Sequence, Optional
 
-
-
+def torch_mlp(
+    sizes: Sequence[int],
+    activation: Optional[nn.Module] = None,
+    output_activation: nn.Module = nn.Identity,
+) -> nn.Sequential: 
+    layers = []
+    for i in range(len(sizes) - 1):
+        act = activation if i < len(sizes) - 2 else output_activation
+        layers += [nn.Linear(sizes[i], sizes[i + 1]), act()]
+        
 class EncoderBN(nn.Module):
     def __init__(self, in_channels, stem_channels, final_feature_width) -> None:
         super().__init__()
@@ -113,6 +122,17 @@ class DecoderBN(nn.Module):
         obs_hat = self.backbone(sample)
         obs_hat = rearrange(obs_hat, "(B L) C H W -> B L C H W", B=batch_size)
         return obs_hat
+
+class LinearEncoder(nn.Module):
+    def __init__(self, 
+                 sizes: Sequence[int], 
+                 activation: Optional[nn.Module] = None, 
+                 output_activation: nn.Module = nn.Identity):
+        super().__init__()
+        self.backbone = torch_mlp(sizes, activation, output_activation)
+
+    def forward(self, x):
+        return self.backbone(x)
 
 
 class DistHead(nn.Module):
@@ -376,23 +396,16 @@ class WorldModel(nn.Module):
 
         return torch.cat([self.latent_buffer, self.hidden_buffer], dim=-1), self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
 
-    def update(self, obs, action, reward, termination, logger=None):
+    def update(self, obs, action, reward, termination, next_obs, logger=None):
         self.train()
         batch_size, batch_length = obs.shape[:2]
 
         with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
             # encoding
             embedding = self.encoder(obs)
-            post_logits = self.dist_head.forward_post(embedding)
-            sample = self.stright_throught_gradient(post_logits, sample_mode="random_sample")
-            flattened_sample = self.flatten_sample(sample)
-
-            # decoding image
-            obs_hat = self.image_decoder(flattened_sample)
-
             # transformer
-            temporal_mask = get_subsequent_mask_with_batch_length(batch_length, flattened_sample.device)
-            dist_feat = self.storm_transformer(flattened_sample, action, temporal_mask)
+            temporal_mask = get_subsequent_mask_with_batch_length(batch_length, embedding.device)
+            dist_feat = self.storm_transformer(embedding, action, temporal_mask)
             prior_logits = self.dist_head.forward_prior(dist_feat)
             # decoding reward and termination with dist_feat
             reward_hat = self.reward_decoder(dist_feat)
@@ -403,10 +416,7 @@ class WorldModel(nn.Module):
             reward_loss = self.symlog_twohot_loss_func(reward_hat, reward)
             termination_loss = self.bce_with_logits_loss_func(termination_hat, termination)
             # dyn-rep loss
-            dynamics_loss, dynamics_real_kl_div = self.categorical_kl_div_loss(post_logits[:, 1:].detach(), prior_logits[:, :-1])
-            representation_loss, representation_real_kl_div = self.categorical_kl_div_loss(post_logits[:, 1:], prior_logits[:, :-1].detach())
-            total_loss = reconstruction_loss + reward_loss + termination_loss + 0.5*dynamics_loss + 0.1*representation_loss
-
+            total_loss = reconstruction_loss + reward_loss + termination_loss
         # gradient descent
         self.scaler.scale(total_loss).backward()
         self.scaler.unscale_(self.optimizer)  # for clip grad

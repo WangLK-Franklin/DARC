@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import repeat, rearrange
 
-from weser.attention_blocks import get_vector_mask
-from weser.attention_blocks import PositionalEncoding1D, AttentionBlock, AttentionBlockKVCache
+from gops.trainer.world_model.weser.attention_blocks import get_vector_mask
+from gops.trainer.world_model.weser.attention_blocks import PositionalEncoding1D, AttentionBlock, AttentionBlockKVCache
 
 
 class StochasticTransformer(nn.Module):
@@ -29,7 +29,7 @@ class StochasticTransformer(nn.Module):
         self.head = nn.Linear(feat_dim, stoch_dim)
 
     def forward(self, samples, action, mask):
-        action = F.one_hot(action.long(), self.action_dim).float()
+        # action = F.one_hot(action.long(), self.action_dim).float()
         feats = self.stem(torch.cat([samples, action], dim=-1))
         feats = self.position_encoding(feats)
         feats = self.layer_norm(feats)
@@ -65,7 +65,7 @@ class StochasticTransformerKVCache(nn.Module):
         '''
         Normal forward pass
         '''
-        action = F.one_hot(action.long(), self.action_dim).float()
+        # action = F.one_hot(action.long(), self.action_dim).float()
         feats = self.stem(torch.cat([samples, action], dim=-1))
         feats = self.position_encoding(feats)
         feats = self.layer_norm(feats)
@@ -90,7 +90,7 @@ class StochasticTransformerKVCache(nn.Module):
         assert samples.shape[1] == 1
         mask = get_vector_mask(self.kv_cache_list[0].shape[1]+1, samples.device)
 
-        action = F.one_hot(action.long(), self.action_dim).float()
+        # action = F.one_hot(action.long(), self.action_dim).float()
         feats = self.stem(torch.cat([samples, action], dim=-1))
         feats = self.position_encoding.forward_with_position(feats, position=self.kv_cache_list[0].shape[1])
         feats = self.layer_norm(feats)

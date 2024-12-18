@@ -168,4 +168,8 @@ tb_tags = {
     "sampler_time": "Time/Sampler time [ms]-RL iter",
     "critic_avg_value": "Train/Critic avg value-RL iter",
     "lips_value": "Lipschitz/Lipschitz value - RL iter",
+    "world_model_reward_loss": "World Model/Reward loss - RL iter",
+    "world_model_termination_loss": "World Model/Termination loss - RL iter",
+    "world_model_total_loss": "World Model/Total loss - RL iter",
+    "world_model_dynamics_loss": "World Model/Dynamics loss - RL iter",
 }

@@ -52,7 +52,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--policy_act_distribution", type=str, default="default")
     policy_func_type = parser.parse_known_args()[0].policy_func_type
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 512, 256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256,512, 256])
     parser.add_argument("--policy_hidden_activation", type=str, default="elu")
     
     parser.add_argument("--mode", type=str, default="train")
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=100000)
+    parser.add_argument("--max_iteration", type=int, default=10000)
     trainer_type = parser.parse_known_args()[0].trainer
     parser.add_argument(
         "--ini_network_dir",

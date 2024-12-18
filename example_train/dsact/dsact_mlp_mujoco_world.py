@@ -23,16 +23,16 @@ from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
-
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
 
     ################################################
     # Key Parameters for users
-    parser.add_argument("--env_id", type=str, default="gym_humanoid", help="id of environment")
+    parser.add_argument("--env_id", type=str, default="gym_bipedalwalker", help="id of environment")
     parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
-    parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
+    parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
     ################################################
     
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=2*500000)
     # Batch size of replay samples from buffer
-    parser.add_argument("--replay_batch_size", type=int, default=256)
+    parser.add_argument("--replay_batch_size", type=int, default=32)
     # Period of sampling
     parser.add_argument("--sample_interval", type=int, default=1)
 
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     # Save value/policy every N updates
     parser.add_argument("--apprfunc_save_interval", type=int, default=50000)
     # Save key info every N updates
-    parser.add_argument("--log_save_interval", type=int, default=10000)
+    parser.add_argument("--log_save_interval", type=int, default=1000)
     
     ################################################
     # 8. Diffusion settings
