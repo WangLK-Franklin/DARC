@@ -109,7 +109,7 @@ def init_args(env, **args):
         dir_path = os.path.dirname(dir_path)
         dir_path = os.path.dirname(dir_path)
         args["save_folder"] = os.path.join(
-            dir_path + "/results/",args["env_id"],
+            dir_path + "/results/",args["env_id"]+'_'+args["trainer_mode"],
             args["algorithm"] +'_'+
             datetime.datetime.now().strftime("%y%m%d-%H%M%S"),
         )

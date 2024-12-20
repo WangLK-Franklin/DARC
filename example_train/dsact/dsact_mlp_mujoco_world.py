@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     ################################################
     # Key Parameters for users
-    parser.add_argument("--env_id", type=str, default="gym_bipedalwalker", help="id of environment")
+    parser.add_argument("--env_id", type=str, default="gym_pusher", help="id of environment")
     parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
@@ -118,11 +118,11 @@ if __name__ == "__main__":
         "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=10000)
+    parser.add_argument("--buffer_warm_size", type=int, default=5000)
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=2*500000)
     # Batch size of replay samples from buffer
-    parser.add_argument("--replay_batch_size", type=int, default=32)
+    parser.add_argument("--replay_batch_size", type=int, default=64)
     # Period of sampling
     parser.add_argument("--sample_interval", type=int, default=1)
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument('--gin_config_files', type=str, default='example_train/config/online/sac_synther_dmc.gin')
     parser.add_argument('--use_gpu', type=bool, default=True)
     parser.add_argument('--device', type=str, default="cuda")
-    
+    parser.add_argument('--trainer_mode', type=str, default="replayer")
     ################################################
     # Get parameter dictionary
     args = vars(parser.parse_args())

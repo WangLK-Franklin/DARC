@@ -152,8 +152,7 @@ class OffSerialWorldTrainer:
         if self.use_gpu:
             self.networks.to('cuda:0')
         self.start_time = time.time()
-        
-    
+       
     def sample(self):
         if self.replay_dict=={} or self.iteration < self.replay_warm_iteration:
             return self.buffer.sample_batch(self.replay_batch_size)
@@ -169,6 +168,12 @@ class OffSerialWorldTrainer:
     def step(self):
         # sampling
         torch.cuda.empty_cache()
+        world_model_tb_dict = {
+            "World_model/reward_loss": 0,
+            "World_model/termination_loss": 0,
+            "World_model/dynamics_loss": 0,
+            "World_model/total_loss": 0,
+        }
         if self.iteration % self.sample_interval == 0:
             with ModuleOnDevice(self.networks, device="cpu"):
                 sampler_samples, sampler_tb_dict = self.sampler.sample()
@@ -195,7 +200,6 @@ class OffSerialWorldTrainer:
 
         
         # print(not self.disable_diffusion and (self.iteration + 1) % self.diffusion_interval == 0 and (self.iteration + 1) >= self.diffusion_start)
-        
         # training
         sampled_data = self.world_sampler.sample(cur_step=self.iteration,
                                                      policy_networks=self.networks,
@@ -212,8 +216,8 @@ class OffSerialWorldTrainer:
                                         reward=replayed_data.reward,
                                         termination=replayed_data.termination)
             self.world_model.eval() 
-            if self.iteration % self.log_save_interval == 0:
-                add_scalars(world_model_tb_dict, self.writer, step=self.iteration)   
+
+                  
             
         if   (self.iteration + 1) % self.replay_interval == 0 and (self.iteration + 1) >= self.replay_start:
             
@@ -237,7 +241,7 @@ class OffSerialWorldTrainer:
             print("Iter = ", self.iteration)
             add_scalars(alg_tb_dict, self.writer, step=self.iteration)
             add_scalars(self.sampler_tb_dict.pop(), self.writer, step=self.iteration)
-            
+            add_scalars(world_model_tb_dict, self.writer, step=self.iteration) 
         # save
         if self.iteration % self.apprfunc_save_interval == 0:
             self.save_apprfunc()

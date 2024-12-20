@@ -39,10 +39,13 @@ class SimpleDiffusionGenerator:
             ema_model,
             num_sample_steps: int = 128,
             sample_batch_size: int = 100000,
+            value:list =[]
     ):
         self.env = env
         self.diffusion = ema_model
         self.diffusion.eval()
+        self.value = value
+        self.scale = 7.5
         # Clamp samples if normalizer is MinMaxNormalizer
         self.clamp_samples = isinstance(self.diffusion.normalizer, MinMaxNormalizer)
         self.num_sample_steps = num_sample_steps
@@ -52,7 +55,7 @@ class SimpleDiffusionGenerator:
     def sample(
             self,
             num_samples: int,
-    ) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+    ):
         assert num_samples % self.sample_batch_size == 0, 'num_samples must be a multiple of sample_batch_size'
         num_batches = num_samples // self.sample_batch_size
         observations = []
@@ -67,8 +70,13 @@ class SimpleDiffusionGenerator:
                 num_sample_steps=self.num_sample_steps,
                 clamp=self.clamp_samples,
             )
-            sampled_outputs = sampled_outputs.cpu().numpy()
-
+            sampled_outputs = sampled_outputs.cpu()
+            sampled_outputs += self.scale*classifier_guidance(
+                torch.tensor(sampled_outputs).float(),
+                torch.tensor(np.zeros((len(sampled_outputs), 1))).float(),
+                self.value,
+                self.diffusion
+            )
             # Split samples into (s, a, r, s') format
             transitions = split_diffusion_samples(sampled_outputs, self.env)
             if len(transitions) == 4:

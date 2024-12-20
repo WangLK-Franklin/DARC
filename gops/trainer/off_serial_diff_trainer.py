@@ -191,9 +191,7 @@ class OffSerialDiffTrainer:
             self.save_apprfunc()
         # print(not self.disable_diffusion and (self.iteration + 1) % self.diffusion_interval == 0 and (self.iteration + 1) >= self.diffusion_start)
         
-        # diffusion_training
-        if self.trainer_type == 'diffusion':
-            
+        # diffusion_training            
             if not self.disable_diffusion and (self.iteration + 1) % self.replay_interval == 0 and (self.iteration + 1) >= self.replay_start:
                 print(f'Retraining diffusion model at step {self.iteration + 1}')
                 diffusion_trainer = REDQTrainer(
@@ -234,8 +232,7 @@ class OffSerialDiffTrainer:
                         print(f'     Real Reward: {np.mean(real_rewards):.2f} {np.std(real_rewards):.2f}')
                         print(f'Replay buffer size: {ptr_location}')
                         print(f'Diffusion buffer size: {self.diffusion_buffer.ptr}')
-        else:
-            
+                        
             self.world_model = world_models.WorldModel(
                 in_channels=self.kwargs.get("in_channels", 1),
                 action_dim=self.dim_act,

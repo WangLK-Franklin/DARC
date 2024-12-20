@@ -405,9 +405,9 @@ class WorldModel(nn.Module):
 
         
         tb_info = {
-            tb_tags["world_model_reward_loss"]: reward_loss.item(),
-            tb_tags["world_model_termination_loss"]: termination_loss.item(),
-            tb_tags["world_model_dynamics_loss"]: dynamics_loss.item(),
-            tb_tags["world_model_total_loss"]: total_loss.item(),
+            "World_model/reward_loss": reward_loss.item(),
+            "World_model/termination_loss": termination_loss.item(),
+            "World_model/dynamics_loss": dynamics_loss.item(),
+            "World_model/total_loss": total_loss.item(),
         }
         return tb_info
