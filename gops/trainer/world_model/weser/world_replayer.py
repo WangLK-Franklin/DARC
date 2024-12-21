@@ -412,11 +412,11 @@ class WorldModel(nn.Module):
             termination_hat = self.termination_decoder(dist_feat)
 
             # env loss
-            reconstruction_loss = self.mse_loss_func(obs_hat, obs)
+            # reconstruction_loss = self.mse_loss_func(obs_hat, obs)
             reward_loss = self.symlog_twohot_loss_func(reward_hat, reward)
             termination_loss = self.bce_with_logits_loss_func(termination_hat, termination)
             # dyn-rep loss
-            total_loss = reconstruction_loss + reward_loss + termination_loss
+            total_loss = reward_loss + termination_loss
         # gradient descent
         self.scaler.scale(total_loss).backward()
         self.scaler.unscale_(self.optimizer)  # for clip grad
@@ -426,11 +426,11 @@ class WorldModel(nn.Module):
         self.optimizer.zero_grad(set_to_none=True)
 
         if logger is not None:
-            logger.log("WorldModel/reconstruction_loss", reconstruction_loss.item())
+            # logger.log("WorldModel/reconstruction_loss", reconstruction_loss.item())
             logger.log("WorldModel/reward_loss", reward_loss.item())
             logger.log("WorldModel/termination_loss", termination_loss.item())
-            logger.log("WorldModel/dynamics_loss", dynamics_loss.item())
-            logger.log("WorldModel/dynamics_real_kl_div", dynamics_real_kl_div.item())
-            logger.log("WorldModel/representation_loss", representation_loss.item())
-            logger.log("WorldModel/representation_real_kl_div", representation_real_kl_div.item())
+            # logger.log("WorldModel/dynamics_loss", dynamics_loss.item())
+            # logger.log("WorldModel/dynamics_real_kl_div", dynamics_real_kl_div.item())
+            # logger.log("WorldModel/representation_loss", representation_loss.item())
+            # logger.log("WorldModel/representation_real_kl_div", representation_real_kl_div.item())
             logger.log("WorldModel/total_loss", total_loss.item())

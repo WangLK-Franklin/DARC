@@ -393,7 +393,7 @@ class WorldModel(nn.Module):
             # dyn-rep loss
             dynamics_loss = self.mse_loss_func(obs[:, 1:].detach(), prior_logits[:, :-1])
 
-            total_loss = + reward_loss + termination_loss + dynamics_loss 
+            total_loss = + reward_loss + 5.0*termination_loss + dynamics_loss 
 
         # gradient descent
         self.scaler.scale(total_loss).backward()

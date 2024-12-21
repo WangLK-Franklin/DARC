@@ -35,18 +35,7 @@ def combine_two_tensors(tensor1, tensor2)->torch.Tensor:
     return torch.concatenate([tensor1, tensor2], axis=0)
 
 def sequence_to_dict(states, actions, rewards, dones, batch_size):
-    """
-    将连续的序列数据转换为字典格式，只取序列第一位
-    
-    参数:
-    states: shape (batch_size, seq_len, state_dim)
-    actions: shape (batch_size, seq_len-1, action_dim)
-    rewards: shape (batch_size, seq_len-1)
-    dones: shape (batch_size, seq_len-1)
-    
-    返回:
-    dict: 包含 'obs', 'obs2', 'action', 'reward', 'done' 的字典
-    """
+   
     data_dict = {
         'obs': states[:, 0].to(dtype=torch.float32).detach(),  # (batch_size, state_dim)
         'obs2': states[:, 1].to(dtype=torch.float32).detach(),  # (batch_size, state_dim)
@@ -131,8 +120,8 @@ class OffSerialWorldTrainer:
                 action_dim=kwargs.get("action_dim", False),
                 transformer_max_length=self.kwargs.get("transformer_max_length", 20),
                 transformer_hidden_dim=self.kwargs.get("transformer_hidden_dim", 512),
-                transformer_num_layers=self.kwargs.get("transformer_num_layers", 6),
-                transformer_num_heads=self.kwargs.get("transformer_num_heads", 1)
+                transformer_num_layers=self.kwargs.get("transformer_num_layers", 2),
+                transformer_num_heads=self.kwargs.get("transformer_num_heads", 6)
             ).to('cuda:0')
         
         # pre sampling and training

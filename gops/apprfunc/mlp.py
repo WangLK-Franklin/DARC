@@ -356,6 +356,8 @@ class ActionValueDistri(nn.Module):
         value_mean, value_std = torch.chunk(logits, chunks=2, dim=-1)
         value_log_std = torch.nn.functional.softplus(value_std) 
         
+        # value_log_std = torch.ones_like(value_log_std)
+        
         return torch.cat((value_mean, value_log_std), dim=-1)
 
 
