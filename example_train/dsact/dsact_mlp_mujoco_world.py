@@ -22,7 +22,7 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
@@ -120,11 +120,11 @@ if __name__ == "__main__":
         "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=5000)
+    parser.add_argument("--buffer_warm_size", type=int, default=1000)
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=2*500000)
     # Batch size of replay samples from buffer
-    parser.add_argument("--replay_batch_size", type=int, default=64)
+    parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
     parser.add_argument("--sample_interval", type=int, default=1)
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('--gin_config_files', type=str, default='example_train/config/online/sac_synther_dmc.gin')
     parser.add_argument('--use_gpu', type=bool, default=True)
     parser.add_argument('--device', type=str, default="cuda")
-    parser.add_argument('--trainer_mode', type=str, default="baseline")
+    parser.add_argument('--trainer_mode', type=str, default="woimagine")
     ################################################
     # Get parameter dictionary
     args = vars(parser.parse_args())

@@ -21,7 +21,7 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 import torch
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 print(torch.cuda.is_available())
@@ -31,16 +31,16 @@ if __name__ == "__main__":
 
     ################################################
     # Key Parameters for users
-    parser.add_argument("--env_id", type=str, default="gym_swimmer", help="id of environment")
+    parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
     parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
-    parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
+    parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
     ################################################
     # 1. Parameters for environment
     parser.add_argument("--reward_scale", type=float, default=1.0, help="reward scale factor")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
-    parser.add_argument('--trainer_mode', type=str, default=None)
+    parser.add_argument('--trainer_mode', type=str, default="default", help="default/adv")
     ################################################
     # 2.1 Parameters of value approximate function
     parser.add_argument(
