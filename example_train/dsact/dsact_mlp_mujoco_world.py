@@ -22,14 +22,14 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-
+    parser.add_argument('--trainer_mode', type=str, default="test")
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('--gin_config_files', type=str, default='example_train/config/online/sac_synther_dmc.gin')
     parser.add_argument('--use_gpu', type=bool, default=True)
     parser.add_argument('--device', type=str, default="cuda")
-    parser.add_argument('--trainer_mode', type=str, default="baseline")
+    
     ################################################
     # Get parameter dictionary
     args = vars(parser.parse_args())

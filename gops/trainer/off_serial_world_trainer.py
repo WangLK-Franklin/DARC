@@ -34,6 +34,7 @@ from gops.trainer.sampler.world_sampler import WorldSampler
 def combine_two_tensors(tensor1, tensor2)->torch.Tensor:
     return torch.concatenate([tensor1, tensor2], axis=0)
 
+
 def sequence_to_dict(states, actions, rewards, dones, batch_size):
    
     data_dict = {
@@ -80,7 +81,7 @@ class OffSerialWorldTrainer:
         self.replay_dict={}
         
         self.replay_start = kwargs.get("replay_start", 10000)
-        self.replay_interval = kwargs.get("replay_interval", 10000)
+        self.replay_interval = kwargs.get("replay_interval", 1)
         self.replay_itertation = 0
         self.replay_warm_iteration = 1
         # self.num_samples = kwargs.get("num_samples", 100000)
@@ -118,10 +119,10 @@ class OffSerialWorldTrainer:
         self.world_model = world_models_gops.WorldModel(
                 state_dim=kwargs.get("obsv_dim", False),
                 action_dim=kwargs.get("action_dim", False),
-                transformer_max_length=self.kwargs.get("transformer_max_length", 20),
+                transformer_max_length=self.kwargs.get("transformer_max_length", 64),
                 transformer_hidden_dim=self.kwargs.get("transformer_hidden_dim", 512),
                 transformer_num_layers=self.kwargs.get("transformer_num_layers", 2),
-                transformer_num_heads=self.kwargs.get("transformer_num_heads", 6)
+                transformer_num_heads=self.kwargs.get("transformer_num_heads", 8)
             ).to('cuda:0')
         
         # pre sampling and training
@@ -147,8 +148,8 @@ class OffSerialWorldTrainer:
             return self.buffer.sample_batch(self.replay_batch_size)
         else:
             # print(f'Using Diffusion batch : {diffusion_batch_size}')
-            return self.buffer.sample_batch(self.replay_batch_size)
-            # return self.replay_dict
+            # return self.buffer.sample_batch(self.replay_batch_size)
+            return self.replay_dict
     # def sample(self):
         
     #     return self.buffer.sample_batch(self.replay_batch_size)
@@ -163,6 +164,7 @@ class OffSerialWorldTrainer:
             "World_model/dynamics_loss": 0,
             "World_model/total_loss": 0,
         }
+        
         if self.iteration % self.sample_interval == 0:
             with ModuleOnDevice(self.networks, device="cpu"):
                 sampler_samples, sampler_tb_dict = self.sampler.sample()
