@@ -29,7 +29,7 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-
+    parser.add_argument('--trainer_mode', type=str, default="test")
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('--gin_config_files', type=str, default='example_train/config/online/sac_synther_dmc.gin')
     parser.add_argument('--use_gpu', type=bool, default=True)
     parser.add_argument('--device', type=str, default="cuda")
-    parser.add_argument('--trainer_mode', type=str, default="woimagine")
+    
     ################################################
     # Get parameter dictionary
     args = vars(parser.parse_args())

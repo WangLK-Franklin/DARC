@@ -291,7 +291,7 @@ class WorldModel(nn.Module):
     def predict_next(self, state, action):
         with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
             dist_feat = self.storm_transformer.forward_with_kv_cache(state, action)
-            prior_logits = self.dist_head.forward_prior(dist_feat)
+            next_obs = self.dist_head.forward_prior(dist_feat)
 
             # # decoding
             # prior_sample = self.stright_throught_gradient(prior_logits, sample_mode="random_sample")
@@ -302,7 +302,7 @@ class WorldModel(nn.Module):
             termination_hat = self.termination_decoder(dist_feat)
             termination_hat = termination_hat > 0
 
-        return prior_logits, reward_hat, termination_hat, dist_feat
+        return next_obs, reward_hat, termination_hat, dist_feat
 
     def stright_throught_gradient(self, logits, sample_mode="random_sample"):
         dist = OneHotCategorical(logits=logits)
@@ -369,8 +369,8 @@ class WorldModel(nn.Module):
             self.reward_hat_buffer[:, i:i+1] = last_reward_hat
             self.termination_hat_buffer[:, i:i+1] = last_termination_hat
             
-            return self.state_buffer, self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
-
+        return self.state_buffer, self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
+        
     def update(self, obs, action, reward, termination, logger=None):
         self.train()
         batch_size, batch_length = obs.shape[:2]
