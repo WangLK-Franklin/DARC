@@ -338,10 +338,10 @@ class WorldModel(nn.Module):
 
     def imagine_data(self, agent, sample_obs, sample_action,
                      imagine_batch_size, imagine_batch_length):
-        self.init_imagine_buffer(imagine_batch_size, imagine_batch_length, dtype=self.tensor_dtype)
+        self.init_imagine_buffer(int(imagine_batch_size/imagine_batch_length), imagine_batch_length, dtype=self.tensor_dtype)
         obs_hat_list = []
 
-        self.storm_transformer.reset_kv_cache_list(imagine_batch_size, dtype=self.tensor_dtype)
+        self.storm_transformer.reset_kv_cache_list(int(imagine_batch_size/imagine_batch_length), dtype=self.tensor_dtype)
         # context
         context_latent = sample_obs
         for i in range(sample_obs.shape[1]):  # context_length is sample_obs.shape[1]
