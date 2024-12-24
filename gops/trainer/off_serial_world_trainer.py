@@ -35,17 +35,41 @@ def combine_two_tensors(tensor1, tensor2)->torch.Tensor:
     return torch.concatenate([tensor1, tensor2], axis=0)
 
 
-def sequence_to_dict(states, actions, rewards, dones, batch_size):
-   
-    data_dict = {
-        'obs': states[:, 0].to(dtype=torch.float32).detach(),  # (batch_size, state_dim)
-        'obs2': states[:, 1].to(dtype=torch.float32).detach(),  # (batch_size, state_dim)
-        'act': actions[:, 0].to(dtype=torch.float32).detach(),      # (batch_size, action_dim)
-        'rew': rewards[:, 0].to(dtype=torch.float32).detach(),  # (batch_size, 1)
-        'done': dones[:, 0].to(dtype=torch.float32).detach()      # (batch_size, 1)
-    }
+def sequence_to_dict(states, actions, rewards, dones, buffer:ReplayBuffer):
+    # 1. 先进行批量数据类型转换
+    states = states.to(torch.float32)
+    actions = actions.to(torch.float32)
+    rewards = rewards.to(torch.float32)
+    dones = dones.to(torch.float32)
     
-    return data_dict
+    # 2. 一次性转换为numpy
+    states_np = states.cpu().numpy()
+    actions_np = actions.cpu().numpy()
+    rewards_np = rewards.cpu().numpy()
+    dones_np = dones.cpu().numpy()
+    
+    # 3. 预分配列表大小
+    batch_size, seq_len = states.shape[:2]
+    imagine_samples = []
+    imagine_samples.extend(
+        (
+            states_np[j, i],#obs
+            actions_np[j, i],#act
+            rewards_np[j, i],#rew
+            dones_np[j, i],#done
+            {"mode": "imagine"},#info
+            states_np[j, i+1],#next_obs
+            {"mode": "imagine"},#next_info
+            np.zeros(1, dtype=np.float32),#logp
+        )
+        for j in range(batch_size)
+        for i in range(seq_len-1)  # -1 因为需要next_obs
+    )
+    
+    # 4. 一次性添加所有样本
+    buffer.add_batch(imagine_samples)
+    
+    
 
 @gin.configurable
 class OffSerialWorldTrainer:
@@ -62,6 +86,7 @@ class OffSerialWorldTrainer:
         self.networks = self.alg.networks
         self.sampler.networks = self.networks
         
+        self.default_sample = True
     
         # initialize center network
         if kwargs["ini_network_dir"] is not None:
@@ -80,8 +105,8 @@ class OffSerialWorldTrainer:
         self.sample_ratio = 0.5
         self.replay_dict={}
         
-        self.replay_start = kwargs.get("replay_start", 10000)
-        self.replay_interval = kwargs.get("replay_interval", 1)
+        self.replay_start = kwargs.get("replay_start", 300000)
+        self.replay_interval = kwargs.get("replay_interval", 1000)
         self.replay_itertation = 0
         self.replay_warm_iteration = 1
         # self.num_samples = kwargs.get("num_samples", 100000)
@@ -148,8 +173,8 @@ class OffSerialWorldTrainer:
             return self.buffer.sample_batch(self.replay_batch_size)
         else:
             # print(f'Using Diffusion batch : {diffusion_batch_size}')
-            # return self.buffer.sample_batch(self.replay_batch_size)
-            return self.replay_dict
+            return self.buffer.sample_batch(self.replay_batch_size)
+            # return self.replay_dict
     # def sample(self):
         
     #     return self.buffer.sample_batch(self.replay_batch_size)
@@ -168,7 +193,8 @@ class OffSerialWorldTrainer:
         if self.iteration % self.sample_interval == 0:
             with ModuleOnDevice(self.networks, device="cpu"):
                 sampler_samples, sampler_tb_dict = self.sampler.sample()
-            self.buffer.add_batch(sampler_samples)
+            if self.default_sample:
+                self.buffer.add_batch(sampler_samples)
             self.sampler_tb_dict.add_average(sampler_tb_dict)
 
         # replay
@@ -211,10 +237,10 @@ class OffSerialWorldTrainer:
                   
             
         if   (self.iteration + 1) % self.replay_interval == 0 and (self.iteration + 1) >= self.replay_start:
-            
+            self.default_sample = False
             with torch.no_grad():
     
-                replayed_data = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
+                replayed_data = self.world_replayer.replay(batch_size=int(self.replay_batch_size/self.batch_length) , batch_length=self.batch_length)
                 # self.imagine_batch_size = int(self.replay_batch_size/self.batch_length)
 
                 state, action, reward_hat, termination_hat = self.world_model.imagine_data(
@@ -224,7 +250,7 @@ class OffSerialWorldTrainer:
                 imagine_batch_size=self.replay_batch_size,
                 imagine_batch_length=self.batch_length,
                 )
-                self.replay_dict = sequence_to_dict(state, action, reward_hat, termination_hat, self.replay_batch_size)
+                sequence_to_dict(state, action, reward_hat, termination_hat, self.buffer)
                 self.replay_itertation += 1
                  
         # log

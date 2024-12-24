@@ -22,14 +22,14 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="test")
+    parser.add_argument('--trainer_mode', type=str, default="smoothed_woenv")
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
