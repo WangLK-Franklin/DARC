@@ -29,7 +29,14 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="smoothed_woenv")
+    parser.add_argument('--trainer_mode', type=str, default="guided1_mixed_policysample")
+    
+    parser.add_argument(
+        "--trainer",
+        type=str,
+        default="off_serial_gen_trainer",
+        help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
+    )
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
@@ -99,12 +106,7 @@ if __name__ == "__main__":
 
     ################################################
     # 4. Parameters for trainer
-    parser.add_argument(
-        "--trainer",
-        type=str,
-        default="off_serial_world_trainer",
-        help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
-    )
+    
     
     # Maximum iteration number
     parser.add_argument("--max_iteration", type=int, default=1500000)
@@ -124,7 +126,7 @@ if __name__ == "__main__":
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=2*500000)
     # Batch size of replay samples from buffer
-    parser.add_argument("--replay_batch_size", type=int, default=64)
+    parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
     parser.add_argument("--sample_interval", type=int, default=1)
 

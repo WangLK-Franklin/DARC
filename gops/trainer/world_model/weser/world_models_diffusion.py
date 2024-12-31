@@ -362,15 +362,13 @@ class WorldModel(nn.Module):
     def predict_next(self, state, action):
         with torch.autocast(device_type='cuda', dtype=torch.bfloat16, enabled=self.use_amp):
             latent,_ = self.state_action_emb(state, action)
+            
             dist_feat = self.storm_transformer.forward_with_kv_cache(latent)
-            next_obs = self.dist_head.forward_prior(dist_feat)
 
-            # # decoding
-            # prior_sample = self.stright_throught_gradient(prior_logits, sample_mode="random_sample")
-            # prior_flattened_sample = self.flatten_sample(prior_sample)
+            next_obs = self.dist_head.forward_prior(dist_feat)
             
             reward_hat = self.reward_decoder(dist_feat)
-            # reward_hat = self.symlog_twohot_loss_func.decode(reward_hat)
+            
             termination_hat = self.termination_decoder(dist_feat)
             termination_hat = termination_hat > 0
 
@@ -416,6 +414,8 @@ class WorldModel(nn.Module):
 
         self.storm_transformer.reset_kv_cache_list(int(imagine_batch_size/imagine_batch_length), dtype=self.tensor_dtype)
         # context
+        sample_obs = sample_obs.unsqueeze(1)
+        sample_action = sample_action.unsqueeze(1)
         context_latent = sample_obs
         for i in range(sample_obs.shape[1]):  # context_length is sample_obs.shape[1]
              last_state, last_reward_hat, last_termination_hat, last_dist_feat = self.predict_next(
