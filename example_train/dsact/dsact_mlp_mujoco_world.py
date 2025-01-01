@@ -40,7 +40,7 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
-    parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="DARC", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
     ################################################
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     # Save value/policy every N updates
     parser.add_argument("--apprfunc_save_interval", type=int, default=50000)
     # Save key info every N updates
-    parser.add_argument("--log_save_interval", type=int, default=1000)
+    parser.add_argument("--log_save_interval", type=int, default=10000)
     
     ################################################
     # 8. Diffusion settings
