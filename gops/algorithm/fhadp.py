@@ -200,7 +200,9 @@ class FHADP(AlgorithmBase):
             a_d = self.networks.policy_d(input,step + 1)
             a_d = torch.tanh(a_d)
             u = w_zero + a_d
-            r_d = self.envmodel.compute_discriminator_reward(data[step][:,self.envmodel.dim_state*(self.envmodel.num_refs+1): ].detach(),u)
+            r_d_low = self.envmodel.compute_discriminator_reward(torch.tensor(self.envmodel.sampler.watermarking[0]),u)
+            r_d_high = self.envmodel.compute_discriminator_reward(torch.tensor(self.envmodel.sampler.watermarking[1]),u)
+            r_d = r_d_low * r_d_high
             w_zero = u
             v_d += r_d * (self.gamma ** step)
         

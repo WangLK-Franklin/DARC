@@ -63,8 +63,12 @@ class PythwatermarkingModel(PythBaseEnv):
         for i in range(self.num_refs):
             next_ref = self.sampler.tensor_sample(self.sample_flag+1+i)
             next_state = torch.cat([next_state, next_ref], dim=1)
-        next_obs = torch.cat([next_state, obs[:,self.dim_state*(self.num_refs+1):]], dim=1)
+        
+        next_obs = torch.cat([next_state, self.sampler.get_tensor_watermarking(self.sample_flag+1).unsqueeze(-1)], dim=1)
+        # else:
+        #     next_obs = torch.cat([next_state, torch.tensor(self.sampler.watermarking[1])], dim=1)
         # next_obs = torch.cat([next_state, self.sampler.tensor_sample(self.sample_flag+1)], dim=1)
+        
         next_info = {}
         for key, value in info.items():
             next_info[key] = value.detach().clone()
