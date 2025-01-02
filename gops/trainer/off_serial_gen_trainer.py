@@ -110,7 +110,7 @@ class OffSerialGenTrainer:
             self.replay_start = 1
             self.replay_interval = 1
         else:
-            self.replay_start = kwargs.get("replay_start", 200000)
+            self.replay_start = kwargs.get("replay_start", 400000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
         self.replay_itertation = 0
         self.replay_warm_iteration = 1
@@ -191,7 +191,7 @@ class OffSerialGenTrainer:
         real_samples = self.buffer.sample_batch(real_batch_size)
         
         if (self.iteration + 1) % self.replay_interval == 0 and (self.iteration + 1) >= self.replay_start:
-            policy_flag = True
+            policy_flag = False
             self.generator_model.mode = "td"
             gen_state = self.generator_model.guided_sample_batch(
                 batch_size=imagine_batch_size, 

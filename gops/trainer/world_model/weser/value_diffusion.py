@@ -343,7 +343,7 @@ class DiffusionModel(nn.Module):
         else:
             x_recon = pred + self.guidance_scale * grad
             
-        x_recon.clamp_(-1., 1.)
+        # x_recon.clamp_(-1., 1.)
         
         model_mean, posterior_variance, posterior_log_variance = self.q_posterior(
             x_start=x_recon, x_t=x_t, t=t
