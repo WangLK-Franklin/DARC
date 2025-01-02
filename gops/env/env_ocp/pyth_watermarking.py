@@ -52,7 +52,8 @@ class Pythwatermarking(PythBaseEnv):
         self.sample_flag = 0
         self.state = self.sampler.sample(0)
         self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
-        self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
+        
+        self.obs = np.concatenate([self.state, self.ref_points, np.array([self.watermarking[0]])])
         self.done = None
         self.seed()
         #todo:env weidu
@@ -81,7 +82,11 @@ class Pythwatermarking(PythBaseEnv):
             self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
         self.t = 0
         self.done = False
-        self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
+        if self.sample_flag <= 99:
+            self.obs = np.concatenate([self.state, self.ref_points, np.array([self.watermarking[0]])])
+        else:
+            self.obs = np.concatenate([self.state, self.ref_points, np.array([self.watermarking[1]])])
+
         # self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
         # self.obs = np.concatenate([self.state, self.ref_points])
         info = {"state": self.obs,
@@ -98,10 +103,13 @@ class Pythwatermarking(PythBaseEnv):
             self.next_state = self.sampler.sample(self.sample_flag+1)
             self.sample_flag += 1
             # self.next_state = self.state + action
-            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
+            self.ref_points = np.array([self.sampler.sample(self.sample_flag+i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
 
             self.reward = self.compute_reward()
-            self.obs = np.concatenate([self.state, self.ref_points, self.watermarking])
+            if self.sample_flag <= 99:
+                self.obs = np.concatenate([self.state, self.ref_points, np.array([self.watermarking[0]])])
+            else:
+                self.obs = np.concatenate([self.state, self.ref_points, np.array([self.watermarking[1]])])
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
             self.done = self.judge_train_done()
         else:
@@ -110,10 +118,13 @@ class Pythwatermarking(PythBaseEnv):
             self.t += 1
             self.next_state = self.state + action
             self.sample_flag +=1
-            self.ref_points = np.array([self.sampler.sample(i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
+            self.ref_points = np.array([self.sampler.sample(self.sample_flag+i+1) for i in range(self.num_refs)]).reshape(1,self.dim_state *self.num_refs).squeeze(0)
 
             self.reward = self.compute_reward()
-            self.obs = np.concatenate([self.next_state, self.ref_points, self.watermarking]) 
+            if self.sample_flag <= 99:
+                self.obs = np.concatenate([self.next_state, self.ref_points, np.array([self.watermarking[0]])])
+            else:
+                self.obs = np.concatenate([self.next_state, self.ref_points, np.array([self.watermarking[1]])])
             # self.obs = np.concatenate([self.next_state, self.ref_points]) 
             self.done = self.judge_eval_done()
         next_info = {}        
@@ -129,6 +140,7 @@ class Pythwatermarking(PythBaseEnv):
         # weighted_state = (self.next_state-self.obs[self.dim_state:self.dim_state*2])* weight 
         weighted_state = (self.next_state-self.obs[self.dim_state:self.dim_state*2])      
         return -np.linalg.norm(weighted_state,1)
+    
     def judge_train_done(self):
         # return  (self.sample_flag >= self.max_length-self.max_episode_steps-1)
         return (self.t > 1) or (self.sample_flag >= self.max_length-self.max_episode_steps-1)

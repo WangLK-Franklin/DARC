@@ -36,4 +36,6 @@ class WatermarkingSamlper:
         ref_points = torch.tensor(ref_points, dtype=torch.float32)
         return ref_points
                 # self.ref_traj = torch.tensor(self.ref_traj, dtype=torch.float32)
-        
+    
+    def get_tensor_watermarking(self,sample_flag:torch.Tensor):
+        return torch.where(sample_flag <= 99, self.watermarking[0], self.watermarking[1])

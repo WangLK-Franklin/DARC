@@ -21,12 +21,13 @@ if __name__ == "__main__":
 
     ################################################
     # Key Parameters for users
+    parser.add_argument("--trainer_mode", type=str, default="dual", help="Options: serial/sync/async/dual")
     parser.add_argument("--env_id", type=str, default="pyth_watermarking", help="id of environment")
     parser.add_argument("--num_refs", type=int, default=1, help="number of reference trajectories")
     parser.add_argument("--dim_watermarking", type=int, default="1", help="dim of watermarking")
     parser.add_argument("--dim_obs", type=int, default=9, help="dim of watermarking")
     parser.add_argument("--watermarking_type", type=str, default="fixed", help="Options: random/fixed")
-    parser.add_argument("--fix_watermarking", type=list, default=[0.5])
+    parser.add_argument("--fix_watermarking", type=list, default=[0,1])
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--pre_horizon", type=int, default=50)
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
