@@ -5,7 +5,7 @@ class WatermarkingSamlper:
     
     def __init__(self,**kwargs):
         
-        path =  "/home/wanglikun/data-watermarking/data/pendulum.csv"
+        path =  "/root/DARC/data/pendulum.csv"
         self.watermarking_mode = kwargs["watermarking_type"]
         if self.watermarking_mode == "random":
             self.watermarking = np.random.rand(int(kwargs["dim_watermarking"]))

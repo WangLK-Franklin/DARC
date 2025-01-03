@@ -28,7 +28,7 @@ from gops.utils.common_utils import get_apprfunc_dict
 from gops.utils.gops_typing import DataDict, InfoDict
 from gops.utils.tensorboard_setup import tb_tags
 import numpy as np
-
+import torch.nn.functional as F
 class ApproxContainer(ApprBase):
     def __init__(
         self,
@@ -202,11 +202,11 @@ class FHADP(AlgorithmBase):
             u = w_zero + a_d
             r_d_low = self.envmodel.compute_discriminator_reward(torch.tensor(self.envmodel.sampler.watermarking[0]),u)
             r_d_high = self.envmodel.compute_discriminator_reward(torch.tensor(self.envmodel.sampler.watermarking[1]),u)
-            r_d = r_d_low * r_d_high
+            r_d = F.smooth_l1_loss(r_d_low*r_d_high,torch.tensor(0))
             w_zero = u
             v_d += r_d * (self.gamma ** step)
         
-        loss_discriminator = -r_d.mean()
+        loss_discriminator = r_d.mean()
         loss_info = {
              tb_tags["loss_discriminator"]: loss_discriminator.item()
          }

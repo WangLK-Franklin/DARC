@@ -93,6 +93,7 @@ class OffSerialGenTrainer:
         if kwargs["ini_network_dir"] is not None:
             self.networks.load_state_dict(torch.load(kwargs["ini_network_dir"]))
 
+        self.trainning_interval = kwargs.get("trainning_interval", 2)
         self.replay_batch_size = kwargs["replay_batch_size"]
         self.batch_length = 16
         self.max_iteration = kwargs["max_iteration"]
@@ -110,13 +111,13 @@ class OffSerialGenTrainer:
             self.replay_start = 1
             self.replay_interval = 1
         else:
-            self.replay_start = kwargs.get("replay_start", 400000)
+            self.replay_start = kwargs.get("replay_start", 1500000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
         self.replay_itertation = 0
         self.replay_warm_iteration = 1
+        
         # self.num_samples = kwargs.get("num_samples", 100000)
         self.writer = SummaryWriter(log_dir=self.save_folder, flush_secs=20)
-
         # flush tensorboard at the beginning
         add_scalars(
             {tb_tags["alg_time"]: 0, tb_tags["sampler_time"]: 0}, self.writer, 0
@@ -160,8 +161,8 @@ class OffSerialGenTrainer:
         while self.buffer.size < kwargs["buffer_warm_size"] or self.world_replayer.length < kwargs["buffer_warm_size"]:
             kwargs["mode"] = "train"
             samples, _ = self.sampler.sample()
-            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
-            self.world_replayer.append(world_samples)
+            # world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
+            # self.world_replayer.append(world_samples)
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()
 
@@ -187,7 +188,7 @@ class OffSerialGenTrainer:
         total_batch_size = self.replay_batch_size
         imagine_batch_size = int(total_batch_size * imagine_ratio)
         real_batch_size = total_batch_size - imagine_batch_size
-        
+        full_samples = self.buffer.sample_batch(total_batch_size)
         real_samples = self.buffer.sample_batch(real_batch_size)
         
         if (self.iteration + 1) % self.replay_interval == 0 and (self.iteration + 1) >= self.replay_start:
@@ -251,7 +252,7 @@ class OffSerialGenTrainer:
             return self.buffer.sample_batch(total_batch_size),mixed_samples,policy_samples,policy_flag
         
         # 如果world_replayer还没准备好，返回全部真实数据
-        return self.buffer.sample_batch(total_batch_size),self.buffer.sample_batch(total_batch_size),self.buffer.sample_batch(total_batch_size),policy_flag
+        return full_samples,full_samples,full_samples,policy_flag
     # def sample(self):
         
     #     return self.buffer.sample_batch(self.replay_batch_size)
@@ -270,8 +271,7 @@ class OffSerialGenTrainer:
         if self.iteration % self.sample_interval == 0:
             with ModuleOnDevice(self.networks, device="cpu"):
                 sampler_samples, sampler_tb_dict = self.sampler.sample()
-            if self.default_sample:
-                self.buffer.add_batch(sampler_samples)
+            self.buffer.add_batch(sampler_samples)
             self.sampler_tb_dict.add_average(sampler_tb_dict)
 
         # replay
@@ -289,8 +289,11 @@ class OffSerialGenTrainer:
         self.generator_model.to('cuda:0')
         self.generator_model.train()
         state=replay_samples["obs"]
-        # action=replay_samples["act"]
-        gen_info = self.generator_model.train_step(self.optimizer, state)
+        print(state[0])
+        if self.iteration % self.trainning_interval == 0:
+            gen_info = self.generator_model.train_step(self.optimizer, state)
+            if self.iteration % self.log_save_interval == 0:
+                add_scalars(gen_info, self.writer, step=self.iteration)
         
         self.networks.train()
         if self.per_flag:
@@ -306,13 +309,13 @@ class OffSerialGenTrainer:
         
         # print(not self.disable_diffusion and (self.iteration + 1) % self.diffusion_interval == 0 and (self.iteration + 1) >= self.diffusion_start)
         # training
-        sampled_data = self.world_sampler.sample(cur_step=self.iteration,
+
+        
+        if self.world_replayer.ready() and self.iteration % self.trainning_interval == 0:
+            sampled_data = self.world_sampler.sample(cur_step=self.iteration,
                                                      policy_networks=self.networks,
                                                      use_random = False)
-        self.world_replayer.append(sampled_data)
-        
-        if self.world_replayer.ready():
-            
+            self.world_replayer.append(sampled_data)
             self.world_model.train()
             with torch.set_grad_enabled(True):
                 replayed_data = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
@@ -321,6 +324,8 @@ class OffSerialGenTrainer:
                                         reward=replayed_data.reward,
                                         termination=replayed_data.termination)
             self.world_model.eval() 
+            if self.iteration % self.log_save_interval == 0:
+                add_scalars(world_model_tb_dict, self.writer, step=self.iteration)
 
                   
             
@@ -348,8 +353,8 @@ class OffSerialGenTrainer:
             print("Iter = ", self.iteration)
             add_scalars(alg_tb_dict, self.writer, step=self.iteration)
             add_scalars(self.sampler_tb_dict.pop(), self.writer, step=self.iteration)
-            add_scalars(world_model_tb_dict, self.writer, step=self.iteration) 
-            add_scalars(gen_info, self.writer, step=self.iteration)
+
+
         # save
         if self.iteration % self.apprfunc_save_interval == 0:
             self.save_apprfunc()

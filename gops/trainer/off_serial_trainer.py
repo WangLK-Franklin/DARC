@@ -73,7 +73,7 @@ class OffSerialTrainer:
 
         self.use_gpu = kwargs["use_gpu"]
         if self.use_gpu:
-            self.networks.cuda()
+            self.networks.to('cuda:0')
 
         self.start_time = time.time()
 
@@ -91,7 +91,7 @@ class OffSerialTrainer:
         # learning
         if self.use_gpu:
             for k, v in replay_samples.items():
-                replay_samples[k] = v.cuda()
+                replay_samples[k] = v.to('cuda:0')
 
         self.networks.train()
         if self.per_flag:

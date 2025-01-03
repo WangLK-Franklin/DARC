@@ -22,14 +22,14 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="guided1_mixed_policysample")
+    parser.add_argument('--trainer_mode', type=str, default="default")
     
     parser.add_argument(
         "--trainer",
@@ -188,4 +188,4 @@ if __name__ == "__main__":
     # Plot and save training figures
     plot_all(args["save_folder"])
     save_tb_to_csv(args["save_folder"])
-    print("Plot & Save are finished!")
+    print("Plot & Save are finished!")    
