@@ -82,6 +82,7 @@ class DiffusionModel(nn.Module):
         # 去噪网络
         self.denoise_net = self._build_denoise_net(hidden_dims, dropout_rate)
 
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
 
     
     def _build_denoise_net(self, hidden_dims, dropout_rate):
@@ -206,7 +207,7 @@ class DiffusionModel(nn.Module):
         target = noise if self.predict_epsilon else x_start
         return F.mse_loss(pred, target)
 
-    def train_step(self, optimizer, state:torch.Tensor):
+    def train_step(self, state:torch.Tensor):
         """
         单步训练流程。
         states_actions: [batch_size, state_dim + action_dim]
@@ -214,10 +215,10 @@ class DiffusionModel(nn.Module):
         batch_size = state.shape[0]
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=state.device)
 
-        optimizer.zero_grad()
+        self.optimizer.zero_grad()
         loss = self.compute_loss(state, t)
         loss.backward()
-        optimizer.step()
+        self.optimizer.step()
         tb_info = {
             "Generator/diffusion_loss": loss.item(),
         }
@@ -312,8 +313,10 @@ class DiffusionModel(nn.Module):
             q1_current = networks.q1(x_t_grad, action)[..., 0]
             q2_current = networks.q2(x_t_grad, action)[..., 0]
             q_current = (q1_current + q2_current) / 2
+            
             x_t_expand = x_t_grad.unsqueeze(1)
             action_expand = action.unsqueeze(1)
+            
             world_model.storm_transformer.reset_kv_cache_list(x_t_expand.shape[0], dtype=x_t_grad.dtype)
             next_obs, reward, _, _ = world_model.predict_next(x_t_expand, action_expand)
             next_obs = next_obs.squeeze(1).float()
@@ -321,6 +324,7 @@ class DiffusionModel(nn.Module):
             next_logits = networks.policy(next_obs)
             next_act_dist = networks.create_action_distributions(next_logits)
             next_action, _ = next_act_dist.rsample()
+            
             q1_next = networks.q1(next_obs, next_action)[..., 0]
             q2_next = networks.q2(next_obs, next_action)[..., 0]
             q_next = (q1_next + q2_next) / 2

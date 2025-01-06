@@ -281,7 +281,10 @@ class CategoricalKLDivLossWithFreeBits(nn.Module):
 
 class WorldModel(nn.Module):
     def __init__(self, state_dim, action_dim,latent_dim,
-                 transformer_max_length, transformer_hidden_dim, transformer_num_layers, transformer_num_heads):
+                 transformer_max_length, 
+                 transformer_hidden_dim, 
+                 transformer_num_layers, 
+                 transformer_num_heads,):
         super().__init__()
         
         self.transformer_hidden_dim = transformer_hidden_dim
@@ -294,6 +297,7 @@ class WorldModel(nn.Module):
         self.imagine_batch_size = -1
         self.imagine_batch_length = -1
         self.action_dim = action_dim
+
         # self.encoder = EncoderBN(
         #     in_channels=in_channels,
         #     stem_channels=32,

@@ -22,14 +22,14 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="default")
+    parser.add_argument('--trainer_mode', type=str, default="check_seed_worldset_nomix")
     
     parser.add_argument(
         "--trainer",
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     )
     ################################################
     # Key Parameters for users
-    parser.add_argument("--env_id", type=str, default="gym_ant", help="id of environment")
+    parser.add_argument("--env_id", type=str, default="gym_walker2d", help="id of environment")
     parser.add_argument("--algorithm", type=str, default="DARC", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=5000)
+    parser.add_argument("--buffer_warm_size", type=int, default=10000)
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=2*500000)
     # Batch size of replay samples from buffer

@@ -14,7 +14,7 @@
 #  Update: 2021-03-05, Ziqing Gu: create DSAC algorithm
 #  Update: 2021-03-05, Wenxuan Wang: debug DSAC algorithm
 
-__all__=["ApproxContainer","DARC"]
+__all__=["ApproxContainer","DARCPI"]
 import math
 import time
 from copy import deepcopy
@@ -82,7 +82,7 @@ class ApproxContainer(ApprBase):
         return self.policy.get_act_dist(logits)
 
 
-class DARC(AlgorithmBase):
+class DARCPI(AlgorithmBase):
     """DSAC algorithm with three refinements, higher performance and more stable.
 
     Paper: https://arxiv.org/abs/2310.05858
@@ -133,8 +133,8 @@ class DARC(AlgorithmBase):
             "delay_update",
         )
 
-    def local_update(self, data: DataDict, iteration: int) -> dict:
-        tb_info = self._compute_gradient(data, iteration)
+    def local_update(self, data: DataDict, data_policy: DataDict, iteration: int,policy_flag: bool) -> dict:
+        tb_info = self._compute_gradient(data, data_policy, iteration,policy_flag)
         self._update(iteration)
         return tb_info
 
@@ -178,7 +178,7 @@ class DARC(AlgorithmBase):
         else:
             return alpha.item()
 
-    def _compute_gradient(self, data: DataDict, iteration: int):
+    def _compute_gradient(self, data: DataDict, data_policy: DataDict,iteration: int,policy_flag: bool):
         start_time = time.time()
 
         obs = data["obs"]
@@ -203,10 +203,21 @@ class DARC(AlgorithmBase):
             p.requires_grad = False
             
         self.networks.policy_optimizer.zero_grad()
-        
-        loss_policy, entropy = self._compute_loss_policy(data)
-        loss_policy.backward()
-    
+        if policy_flag == False:
+            loss_policy, entropy = self._compute_loss_policy(data)
+            loss_policy.backward()
+        else:
+            obs = data_policy["obs"]
+            logits = self.networks.policy(obs)
+            logits_mean, logits_std = torch.chunk(logits, chunks=2, dim=-1)
+            policy_mean = torch.tanh(logits_mean).mean().item()
+            policy_std = logits_std.mean().item()
+
+            act_dist = self.networks.create_action_distributions(logits)
+            new_act, new_log_prob = act_dist.rsample()
+            data_policy.update({"new_act": new_act, "new_log_prob": new_log_prob})
+            loss_policy, entropy = self._compute_loss_policy(data_policy)
+            loss_policy.backward()
             
         for p in self.networks.q1.parameters():
             p.requires_grad = True
