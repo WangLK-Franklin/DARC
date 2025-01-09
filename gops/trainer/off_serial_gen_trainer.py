@@ -124,7 +124,7 @@ class OffSerialGenTrainer:
             self.replay_interval = 1
             self.pre_train_step = 1
         else:
-            self.replay_start = kwargs.get("replay_start", 100000)
+            self.replay_start = kwargs.get("replay_start", 200000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
             self.pre_train_step = 1
         self.writer = SummaryWriter(log_dir=self.save_folder, flush_secs=20)
