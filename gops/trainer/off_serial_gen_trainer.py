@@ -20,6 +20,7 @@ import numpy as np
 import gin
 import ray
 import torch
+from tqdm.auto import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from easydict import EasyDict as edict
 import random
@@ -121,9 +122,11 @@ class OffSerialGenTrainer:
         if kwargs["trainer_mode"] == "debug":
             self.replay_start = 1
             self.replay_interval = 1
+            self.pre_train_step = 1
         else:
-            self.replay_start = kwargs.get("replay_start", 1500000)
+            self.replay_start = kwargs.get("replay_start", 100000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
+            self.pre_train_step = 1
         self.writer = SummaryWriter(log_dir=self.save_folder, flush_secs=20)
         # flush tensorboard at the beginning
         add_scalars(
@@ -168,12 +171,29 @@ class OffSerialGenTrainer:
         while self.buffer.size < kwargs["buffer_warm_size"]:
             kwargs["mode"] = "train"
             samples, _ = self.sampler.sample()
-            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
-            self.world_replayer.append(world_samples)
+            
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()
 
+        while not self.world_replayer.ready():
+            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
+            self.world_replayer.append(world_samples)
         # create evaluation tasks
+        
+        pbar = tqdm(range(self.pre_train_step), desc="预训练世界模型")
+        for i in pbar:
+            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
+            self.world_replayer.append(world_samples)
+            pre_samples = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
+            world_td = self.world_model.update(obs=pre_samples.obs, 
+                                        action=pre_samples.action, 
+                                        reward=pre_samples.reward,
+                                        termination=pre_samples.termination)
+
+            pbar.set_postfix({
+                'dynamics_loss': f'{world_td["World_model/dynamics_loss"]:.4f}',
+                'reward_loss': f'{world_td["World_model/reward_loss"]:.4f}'
+            })
         self.evluate_tasks = TaskPool()
         self.last_eval_iteration = 0
 
@@ -274,8 +294,8 @@ class OffSerialGenTrainer:
             self.sampler_tb_dict.add_average(sampler_tb_dict)
 
         # replay
-        # replay_samples = self.mixed_sample()
-        replay_samples = self.buffer.sample_batch(self.replay_batch_size)
+        replay_samples = self.mixed_sample()
+        # replay_samples = self.buffer.sample_batch(self.replay_batch_size)
         
         
         # learning
@@ -283,10 +303,10 @@ class OffSerialGenTrainer:
                 for k, v in replay_samples.items():
                     replay_samples[k] = v.to('cuda:0')
     
-        # self.generator_model.to('cuda:0')
-        # self.generator_model.train()
+        self.generator_model.to('cuda:0')
+        self.generator_model.train()
         state=replay_samples["obs"]
-        if self.iteration % self.trainning_interval == 0 and self.iteration >= self.replay_start:
+        if self.iteration % self.trainning_interval == 0:
             gen_info = self.generator_model.train_step(state)
             if self.iteration % self.log_save_interval == 0:
                 add_scalars(gen_info, self.writer, step=self.iteration)

@@ -22,14 +22,14 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="check_seed_worldset_nomix")
+    parser.add_argument('--trainer_mode', type=str, default="pretrain20_world")
     
     parser.add_argument(
         "--trainer",
@@ -128,13 +128,13 @@ if __name__ == "__main__":
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
-    parser.add_argument("--sample_interval", type=int, default=1)
+    parser.add_argument("--sample_interval", type=int, default=20)
 
     ################################################
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store    
-    parser.add_argument("--sample_batch_size", type=int, default=20)
+    parser.add_argument("--sample_batch_size", type=int, default=1)
     # Add noise to action for better exploration
     parser.add_argument("--noise_params", type=dict, default=None)
 
