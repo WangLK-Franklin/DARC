@@ -34,6 +34,8 @@ from world_model.weser import world_models_diffusion
 from gops.trainer.buffer.world_buffer import WorldBuffer
 from gops.trainer.sampler.world_sampler import WorldSampler
 from gops.trainer.world_model.weser.value_diffusion import DiffusionModel
+from gops.trainer.world_model.weser.discriminator import State_discriminator
+from gops.trainer.world_model.weser.discriminator import Dynamics_discriminator
 def combine_two_tensors(tensor1, tensor2)->torch.Tensor:
     return torch.concatenate([tensor1, tensor2], axis=0)
 
@@ -98,7 +100,7 @@ class OffSerialGenTrainer:
         # create center network
         self.networks = self.alg.networks
         self.sampler.networks = self.networks
-        
+        self.behavior_path = "/root/DARC/results/gym_walker2d_default8/DSACT_250111-134330/apprfunc/apprfunc_1462500_opt.pkl"
         self.default_sample = True
         seed_np_torch(self.seed)
         # initialize center network
@@ -126,7 +128,7 @@ class OffSerialGenTrainer:
         else:
             self.replay_start = kwargs.get("replay_start", 100000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
-            self.pre_train_step = 1
+            self.pre_train_step = 200000
         self.writer = SummaryWriter(log_dir=self.save_folder, flush_secs=20)
         # flush tensorboard at the beginning        git remote set-url origin git@github.com:WangLK-Franklin/DARC.git
         add_scalars(
@@ -167,33 +169,44 @@ class OffSerialGenTrainer:
         self.generator_model = DiffusionModel(
             state_dim=kwargs.get("obsv_dim", None)).to('cuda:0')
         
-
+        self.state_discriminator = State_discriminator(kwargs.get("obsv_dim", None))
+        self.dynamics_discriminator = Dynamics_discriminator(kwargs.get("obsv_dim", None), kwargs.get("action_dim", None))
         while self.buffer.size < kwargs["buffer_warm_size"]:
             kwargs["mode"] = "train"
             samples, _ = self.sampler.sample()
-            
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()
 
+        self.behavior_policy = self.alg.networks
+        self.behavior_policy.load_state_dict(torch.load(self.behavior_path))
+        self.behavior_policy.eval()
+        self.behavior_policy.to('cuda')
+        
         while not self.world_replayer.ready():
-            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
+            world_samples = self.world_sampler.sample(self.iteration,self.behavior_policy,use_random=False)
             self.world_replayer.append(world_samples)
         # create evaluation tasks
         
-        pbar = tqdm(range(self.pre_train_step), desc="预训练世界模型")
+        pbar = tqdm(range(self.pre_train_step), desc='Pre-training World Model')
         for i in pbar:
-            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
+            world_samples = self.world_sampler.sample(self.iteration,self.behavior_policy,use_random=False)
             self.world_replayer.append(world_samples)
-            pre_samples = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
-            world_td = self.world_model.update(obs=pre_samples.obs, 
-                                        action=pre_samples.action, 
-                                        reward=pre_samples.reward,
-                                        termination=pre_samples.termination)
-
-            pbar.set_postfix({
-                'dynamics_loss': f'{world_td["World_model/dynamics_loss"]:.4f}',
-                'reward_loss': f'{world_td["World_model/reward_loss"]:.4f}'
-            })
+            self.world_model.train()
+            with torch.set_grad_enabled(True):
+                replayed_data = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
+                world_model_tb_dict = self.world_model.update(obs=replayed_data.obs, 
+                                        action=replayed_data.action, 
+                                        reward=replayed_data.reward,
+                                        termination=replayed_data.termination)
+                dynamic_loss = world_model_tb_dict["World_model/total_loss"]
+                reward_loss = world_model_tb_dict["World_model/reward_loss"]
+                
+                # 更新进度条描述，显示当前损失
+                pbar.set_postfix({
+                    'dynamic_loss': f'{dynamic_loss:.4f}',
+                    'reward_loss': f'{reward_loss:.4f}'
+                })
+                
         self.evluate_tasks = TaskPool()
         self.last_eval_iteration = 0
 
@@ -236,7 +249,9 @@ class OffSerialGenTrainer:
                 "act": action.squeeze(1).to('cpu'),
                 "rew": reward_hat.squeeze(1).to('cpu'),
                 "done": termination_hat.squeeze(1).to('cpu'),
-                "obs_next": state[:, 1:].squeeze(1).to('cpu') if state.shape[1] > 1 else state.squeeze(1).to('cpu')
+                "obs_next": state[:, 1:].squeeze(1).to('cpu') if state.shape[1] > 1 else state.squeeze(1).to('cpu'),
+                "type": "imagine",
+                # "importance_weight": self.dynamics_discriminator.forward(state[:, 1:].squeeze(1).to('cpu') if state.shape[1] > 1 else state.squeeze(1).to('cpu'))
             }
             
             # 3. 合并两种数据
@@ -342,27 +357,6 @@ class OffSerialGenTrainer:
             if self.iteration % self.log_save_interval == 0:
                 add_scalars(world_model_tb_dict, self.writer, step=self.iteration)
 
-                  
-            
-        # if   (self.iteration + 1) % self.replay_interval == 0 and (self.iteration + 1) >= self.replay_start:
-        #     self.default_sample = False
-            
-        #     # replayed_data = self.world_replayer.replay(batch_size=int(self.replay_batch_size/self.batch_length) , batch_length=self.batch_length)
-        #     # self.imagine_batch_size = int(self.replay_batch_size/self.batch_length)
-        #     gen_state = self.generator_model.guided_sample_batch(batch_size=int(self.replay_batch_size/self.batch_length), world_model=self.world_model, policy_net=self.networks)
-        #     logits = self.networks.policy(gen_state)
-        #     action_distribution = self.networks.create_action_distributions(logits)
-        #     gen_action, logp = action_distribution.sample()
-        #     state, action, reward_hat, termination_hat = self.world_model.imagine_data(
-        #     agent=self.networks, 
-        #     sample_obs=gen_state, 
-        #     sample_action=gen_action,
-        #     imagine_batch_size=self.replay_batch_size,
-        #     imagine_batch_length=self.batch_length,
-        #     )
-        #     sequence_to_dict(state, action, reward_hat, termination_hat, self.buffer)
-        #     self.replay_itertation += 1
-                 
         # log
         if self.iteration % self.log_save_interval == 0:
             print("Iter = ", self.iteration)

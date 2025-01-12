@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from typing import List
 from tqdm import tqdm
 from torch.distributions import Normal
-from torchviz import make_dot
+ 
 def cosine_beta_schedule(timesteps, s=0.008):
     """
     余弦调度的Beta参数计算

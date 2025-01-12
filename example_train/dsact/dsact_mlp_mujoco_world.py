@@ -11,6 +11,10 @@
 import os
 import argparse
 import gin
+import sys
+
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+sys.path.append(root_dir)
 
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
@@ -22,7 +26,9 @@ from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 
@@ -134,7 +140,7 @@ if __name__ == "__main__":
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store    
-    parser.add_argument("--sample_batch_size", type=int, default=1)
+    parser.add_argument("--sample_batch_size", type=int, default=8)
     # Add noise to action for better exploration
     parser.add_argument("--noise_params", type=dict, default=None)
 
