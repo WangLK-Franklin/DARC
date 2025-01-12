@@ -21,6 +21,7 @@ import gin
 import ray
 import torch
 from tqdm.auto import tqdm
+import copy
 from torch.utils.tensorboard import SummaryWriter
 from easydict import EasyDict as edict
 import random
@@ -177,7 +178,7 @@ class OffSerialGenTrainer:
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()
 
-        self.behavior_policy = self.alg.networks
+        self.behavior_policy = copy.deepcopy(self.alg.networks)
         self.behavior_policy.load_state_dict(torch.load(self.behavior_path))
         self.behavior_policy.eval()
         self.behavior_policy.to('cuda')
@@ -200,11 +201,15 @@ class OffSerialGenTrainer:
                                         termination=replayed_data.termination)
                 dynamic_loss = world_model_tb_dict["World_model/total_loss"]
                 reward_loss = world_model_tb_dict["World_model/reward_loss"]
-                
-                # 更新进度条描述，显示当前损失
+                state = replayed_data.obs
+                self.generator_model.train()
+                gen_td = self.generator_model.train_step(state)
+                gen_td_loss = gen_td["Generator/diffusion_loss"]
+
                 pbar.set_postfix({
                     'dynamic_loss': f'{dynamic_loss:.4f}',
-                    'reward_loss': f'{reward_loss:.4f}'
+                    'reward_loss': f'{reward_loss:.4f}',
+                    'gen_td_loss': f'{gen_td_loss:.4f}'
                 })
                 
         self.evluate_tasks = TaskPool()
@@ -341,7 +346,7 @@ class OffSerialGenTrainer:
         # training
 
         
-        if self.iteration % self.trainning_interval == 0 and self.iteration >= self.replay_start:
+        if self.iteration % self.trainning_interval == 0:
             sampled_data = self.world_sampler.sample(cur_step=self.iteration,
                                                      policy_networks=self.networks,
                                                      use_random = False)
