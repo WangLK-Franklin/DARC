@@ -31,7 +31,7 @@ from gops.utils.tensorboard_setup import add_scalars, tb_tags
 from gops.utils.log_data import LogData
 from gops.trainer.buffer.replay_buffer import ReplayBuffer
 
-from world_model.weser import world_models_diffusion
+from gops.trainer.world_model.weser import world_models_diffusion
 from gops.trainer.buffer.world_buffer import WorldBuffer
 from gops.trainer.sampler.world_sampler import WorldSampler
 from gops.trainer.world_model.weser.value_diffusion import DiffusionModel
@@ -127,7 +127,7 @@ class OffSerialGenTrainer:
             self.replay_interval = 1
             self.pre_train_step = 1
         else:
-            self.replay_start = kwargs.get("replay_start", 100000)
+            self.replay_start = kwargs.get("replay_start", 200000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
             self.pre_train_step = 200000
         self.writer = SummaryWriter(log_dir=self.save_folder, flush_secs=20)
@@ -178,39 +178,39 @@ class OffSerialGenTrainer:
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()
 
-        self.behavior_policy = copy.deepcopy(self.alg.networks)
-        self.behavior_policy.load_state_dict(torch.load(self.behavior_path))
-        self.behavior_policy.eval()
-        self.behavior_policy.to('cuda')
+        # self.behavior_policy = copy.deepcopy(self.alg.networks)
+        # self.behavior_policy.load_state_dict(torch.load(self.behavior_path))
+        # self.behavior_policy.eval()
+        # self.behavior_policy.to('cuda')
         
         while not self.world_replayer.ready():
-            world_samples = self.world_sampler.sample(self.iteration,self.behavior_policy,use_random=False)
+            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
             self.world_replayer.append(world_samples)
         # create evaluation tasks
         
-        pbar = tqdm(range(self.pre_train_step), desc='Pre-training World Model')
-        for i in pbar:
-            world_samples = self.world_sampler.sample(self.iteration,self.behavior_policy,use_random=False)
-            self.world_replayer.append(world_samples)
-            self.world_model.train()
-            with torch.set_grad_enabled(True):
-                replayed_data = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
-                world_model_tb_dict = self.world_model.update(obs=replayed_data.obs, 
-                                        action=replayed_data.action, 
-                                        reward=replayed_data.reward,
-                                        termination=replayed_data.termination)
-                dynamic_loss = world_model_tb_dict["World_model/total_loss"]
-                reward_loss = world_model_tb_dict["World_model/reward_loss"]
-                state = replayed_data.obs
-                self.generator_model.train()
-                gen_td = self.generator_model.train_step(state)
-                gen_td_loss = gen_td["Generator/diffusion_loss"]
+        # pbar = tqdm(range(self.pre_train_step), desc='Pre-training World Model')
+        # for i in pbar:
+        #     world_samples = self.world_sampler.sample(self.iteration,self.behavior_policy,use_random=False)
+        #     self.world_replayer.append(world_samples)
+        #     self.world_model.train()
+        #     with torch.set_grad_enabled(True):
+        #         replayed_data = self.world_replayer.replay(batch_size=self.replay_batch_size , batch_length=self.batch_length)
+        #         world_model_tb_dict = self.world_model.update(obs=replayed_data.obs, 
+        #                                 action=replayed_data.action, 
+        #                                 reward=replayed_data.reward,
+        #                                 termination=replayed_data.termination)
+        #         dynamic_loss = world_model_tb_dict["World_model/total_loss"]
+        #         reward_loss = world_model_tb_dict["World_model/reward_loss"]
+        #         state = replayed_data.obs[:,0,:]
+        #         self.generator_model.train()
+        #         gen_td = self.generator_model.train_step(state)
+        #         gen_td_loss = gen_td["Generator/diffusion_loss"]
 
-                pbar.set_postfix({
-                    'dynamic_loss': f'{dynamic_loss:.4f}',
-                    'reward_loss': f'{reward_loss:.4f}',
-                    'gen_td_loss': f'{gen_td_loss:.4f}'
-                })
+        #         pbar.set_postfix({
+        #             'dynamic_loss': f'{dynamic_loss:.4f}',
+        #             'reward_loss': f'{reward_loss:.4f}',
+        #             'gen_td_loss': f'{gen_td_loss:.4f}'
+        #         })
                 
         self.evluate_tasks = TaskPool()
         self.last_eval_iteration = 0
@@ -254,7 +254,7 @@ class OffSerialGenTrainer:
                 "act": action.squeeze(1).to('cpu'),
                 "rew": reward_hat.squeeze(1).to('cpu'),
                 "done": termination_hat.squeeze(1).to('cpu'),
-                "obs_next": state[:, 1:].squeeze(1).to('cpu') if state.shape[1] > 1 else state.squeeze(1).to('cpu'),
+                "obs_next": state[:, 1:].squeeze(1).to('cpu'),
                 "type": "imagine",
                 # "importance_weight": self.dynamics_discriminator.forward(state[:, 1:].squeeze(1).to('cpu') if state.shape[1] > 1 else state.squeeze(1).to('cpu'))
             }
@@ -274,20 +274,6 @@ class OffSerialGenTrainer:
                             real_samples[key],
                             real_samples[key][:imagine_batch_size]
                         ], dim=0)
-            
-            # self.generator_model.mode = "entropy"
-            # gen_state_for_policy = self.generator_model.guided_sample_batch(
-            # batch_size=self.replay_batch_size, 
-            # world_model=self.world_model, 
-            # policy_net=self.networks
-            # )
-            # policy_samples = {
-            #     "obs": gen_state_for_policy.detach().to('cpu'),
-            #     "act": action.squeeze(1).to('cpu'),
-            #     "rew": reward_hat.squeeze(1).to('cpu'),
-            #     "done": termination_hat.squeeze(1).to('cpu'),
-            #     "obs_next": gen_state_for_policy.detach().to('cpu')
-            # }
             return mixed_samples
         
         # 如果world_replayer还没准备好，返回全部真实数据

@@ -418,33 +418,34 @@ class WorldModel(nn.Module):
 
         self.storm_transformer.reset_kv_cache_list(int(imagine_batch_size/imagine_batch_length), dtype=self.tensor_dtype)
         # context
-        sample_obs = sample_obs.unsqueeze(1)
-        sample_action = sample_action.unsqueeze(1)
-        context_latent = sample_obs
+        current_obs = sample_obs.unsqueeze(1)
+        current_action = sample_action.unsqueeze(1)
+
+        self.state_buffer[:, 0:1] = current_obs
+        self.action_buffer[:, 0:1] = current_action
         for i in range(sample_obs.shape[1]):  # context_length is sample_obs.shape[1]
-             last_state, last_reward_hat, last_termination_hat, last_dist_feat = self.predict_next(
-                context_latent[:, i:i+1],
-                sample_action[:, i:i+1],
-            )
-        self.state_buffer[:, 0:1] = last_state
-        self.hidden_buffer[:, 0:1] = last_dist_feat
-
-        # imagine
-        for i in range(imagine_batch_length):
-            logits = agent.policy(self.state_buffer[:, i:i+1].float())
-            action_distribution = agent.create_action_distributions(logits)
-            action, logp = action_distribution.sample()
-            action = action.to(device=self.state_buffer.device, dtype=self.state_buffer.dtype)
-            self.action_buffer[:, i:i+1] = action
-
             last_state, last_reward_hat, last_termination_hat, last_dist_feat = self.predict_next(
-                self.state_buffer[:, i:i+1], self.action_buffer[:, i:i+1])
-
-         
+                self.state_buffer[:, i:i+1],
+                self.action_buffer[:, i:i+1])
             self.state_buffer[:, i+1:i+2] = last_state
-            self.hidden_buffer[:, i+1:i+2] = last_dist_feat
             self.reward_hat_buffer[:, i:i+1] = last_reward_hat
             self.termination_hat_buffer[:, i:i+1] = last_termination_hat
+        # imagine
+        # for i in range(imagine_batch_length):
+        #     logits = agent.policy(self.state_buffer[:, i:i+1].float())
+        #     action_distribution = agent.create_action_distributions(logits)
+        #     action, logp = action_distribution.sample()
+        #     action = action.to(device=self.state_buffer.device, dtype=self.state_buffer.dtype)
+        #     self.action_buffer[:, i:i+1] = action
+
+        #     last_state, last_reward_hat, last_termination_hat, last_dist_feat = self.predict_next(
+        #         self.state_buffer[:, i:i+1], self.action_buffer[:, i:i+1])
+
+         
+        #     self.state_buffer[:, i+1:i+2] = last_state
+        #     self.hidden_buffer[:, i+1:i+2] = last_dist_feat
+        #     self.reward_hat_buffer[:, i:i+1] = last_reward_hat
+        #     self.termination_hat_buffer[:, i:i+1] = last_termination_hat
             
         return self.state_buffer, self.action_buffer, self.reward_hat_buffer, self.termination_hat_buffer
         

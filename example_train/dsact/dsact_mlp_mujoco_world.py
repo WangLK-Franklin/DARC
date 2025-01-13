@@ -35,7 +35,7 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="pretrain20_world")
+    parser.add_argument('--trainer_mode', type=str, default="debug")
     
     parser.add_argument(
         "--trainer",
