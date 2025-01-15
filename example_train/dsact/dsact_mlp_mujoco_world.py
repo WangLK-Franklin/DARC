@@ -35,18 +35,18 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="debug")
+    parser.add_argument('--trainer_mode', type=str, default="0115_tt_nopretrain")
     
     parser.add_argument(
         "--trainer",
         type=str,
         default="off_serial_gen_trainer",
-        help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
+        help="Options: on_serial_gen_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_walker2d", help="id of environment")
-    parser.add_argument("--algorithm", type=str, default="DARC", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
     ################################################
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
-    parser.add_argument("--sample_interval", type=int, default=20)
+    parser.add_argument("--sample_interval", type=int, default=1)
 
     ################################################
     # 5. Parameters for sampler

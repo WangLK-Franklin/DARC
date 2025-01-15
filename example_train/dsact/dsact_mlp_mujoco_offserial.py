@@ -31,7 +31,7 @@ print(torch.cuda.is_available())
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="default4")
+    parser.add_argument('--trainer_mode', type=str, default="default8new")
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_walker2d", help="id of environment")
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store
-    parser.add_argument("--sample_batch_size", type=int, default=4)
+    parser.add_argument("--sample_batch_size", type=int, default=8)
     # Add noise to action for better exploration
     parser.add_argument("--noise_params", type=dict, default=None)
 

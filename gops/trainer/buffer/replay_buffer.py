@@ -48,6 +48,7 @@ class ReplayBuffer:
             "done": np.zeros(self.max_size, dtype=dtype),
             "logp": np.zeros(self.max_size, dtype=dtype),
             "priority": np.zeros(self.max_size, dtype=dtype),
+            "weight": np.ones(self.max_size, dtype=dtype),
         }
         self.additional_info = kwargs["additional_info"]
         for k, v in self.additional_info.items():

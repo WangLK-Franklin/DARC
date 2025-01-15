@@ -190,7 +190,7 @@ class DARC(AlgorithmBase):
         act_dist = self.networks.create_action_distributions(logits)
         new_act, new_log_prob = act_dist.rsample()
         data.update({"new_act": new_act, "new_log_prob": new_log_prob})
-
+        
         self.networks.q1_optimizer.zero_grad()
         self.networks.q2_optimizer.zero_grad()
         loss_q, q1, q2, std1, std2, min_std1, min_std2 = self._compute_loss_q(data)

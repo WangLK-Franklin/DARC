@@ -31,21 +31,12 @@ class Dynamics_discriminator(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.2),
             
-            nn.Linear(512, 384),
-            nn.LayerNorm(384),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            
-            nn.Linear(384, 256),
+            nn.Linear(512, 256),
             nn.LayerNorm(256),
             nn.ReLU(),
             nn.Dropout(0.2),
             
-            nn.Linear(256, 128),
-            nn.LayerNorm(128),
-            nn.ReLU(),
-            
-            nn.Linear(128, 64),
+            nn.Linear(512, 64),
             nn.LayerNorm(64),
             nn.ReLU(),
             
@@ -55,7 +46,7 @@ class Dynamics_discriminator(nn.Module):
         
         # 在所有网络层构建完成后再初始化优化器
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        self.criterion = torch.nn.CrossEntropyLoss()
+        self.criterion = nn.BCELoss()
         
     def forward(self, state, action, next_state):
         # 分别编码状态和动作
@@ -68,16 +59,6 @@ class Dynamics_discriminator(nn.Module):
         return self.dynamics_processor(combined)
     
     def update_step(self, real_batch, fake_batch):
-        """
-        执行一步判别器更新
-        
-        Args:
-            real_batch: 元组 (state, action, next_state) 包含真实轨迹
-            fake_batch: 元组 (state, action, next_state) 包含生成轨迹
-        
-        Returns:
-            dict: 包含损失和准确率信息
-        """
         self.optimizer.zero_grad()
         
         # 解包数据
@@ -87,36 +68,47 @@ class Dynamics_discriminator(nn.Module):
         batch_size = real_state.shape[0]
         device = real_state.device
         
-        # 创建标签
-        real_labels = torch.ones(batch_size, dtype=torch.long, device=device)
-        fake_labels = torch.zeros(batch_size, dtype=torch.long, device=device)
+        # 混合真实和生成的数据
+        mixed_states = torch.cat([real_state, fake_state], dim=0)
+        mixed_actions = torch.cat([real_action, fake_action], dim=0)
+        mixed_next_states = torch.cat([real_next_state, fake_next_state], dim=0)
         
-        # 真实数据的前向传播和损失计算
-        real_pred = self.forward(real_state, real_action, real_next_state)
-        real_loss = self.criterion(real_pred, real_labels)
+        # 创建对应的标签
+        real_labels = torch.zeros((batch_size, 2), device=device)
+        real_labels[:, 0] = 1  # [1,0] for real
+        fake_labels = torch.zeros((batch_size, 2), device=device)
+        fake_labels[:, 1] = 1  # [0,1] for fake
+        mixed_labels = torch.cat([real_labels, fake_labels], dim=0)
         
-        # 生成数据的前向传播和损失计算
-        fake_pred = self.forward(fake_state, fake_action, fake_next_state)
-        fake_loss = self.criterion(fake_pred, fake_labels)
+        # 生成随机排列索引
+        perm = torch.randperm(2 * batch_size, device=device)
         
-        # 总损失
-        total_loss = real_loss + fake_loss
+        # 打乱数据和标签
+        mixed_states = mixed_states[perm]
+        mixed_actions = mixed_actions[perm]
+        mixed_next_states = mixed_next_states[perm]
+        mixed_labels = mixed_labels[perm]
+        
+        # 前向传播
+        mixed_pred = self.forward(mixed_states, mixed_actions, mixed_next_states)
+        loss = self.criterion(mixed_pred, mixed_labels)
         
         # 反向传播和优化
-        total_loss.backward()
+        loss.backward()
         self.optimizer.step()
         
-        # 计算准确率
-        real_acc = (real_pred.argmax(dim=1) == real_labels).float().mean()
-        fake_acc = (fake_pred.argmax(dim=1) == fake_labels).float().mean()
+        # 计算准确率 (需要根据标签来区分真实和生成样本)
+        real_mask = mixed_labels[:, 0] == 1  # 找出真实样本的位置
+        fake_mask = mixed_labels[:, 1] == 1  # 找出生成样本的位置
+        
+        real_acc = (mixed_pred[real_mask].argmax(dim=1) == 0).float().mean()
+        fake_acc = (mixed_pred[fake_mask].argmax(dim=1) == 1).float().mean()
         
         return {
-            'total_loss': total_loss.item(),
-            'real_loss': real_loss.item(),
-            'fake_loss': fake_loss.item(),
-            'real_accuracy': real_acc.item(),
-            'fake_accuracy': fake_acc.item(),
-            'avg_accuracy': (real_acc + fake_acc).item() / 2
+            'Dynamics_discriminator/total_loss': loss.item(),
+            'Dynamics_discriminator/real_accuracy': real_acc.item(),
+            'Dynamics_discriminator/fake_accuracy': fake_acc.item(),
+            'Dynamics_discriminator/avg_accuracy': (real_acc + fake_acc).item() / 2
         }
 class State_discriminator(nn.Module):
     def __init__(self, state_dim):

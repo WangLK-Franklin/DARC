@@ -423,7 +423,7 @@ class WorldModel(nn.Module):
 
         self.state_buffer[:, 0:1] = current_obs
         self.action_buffer[:, 0:1] = current_action
-        for i in range(sample_obs.shape[1]):  # context_length is sample_obs.shape[1]
+        for i in range(current_obs.shape[1]):  # context_length is sample_obs.shape[1]
             last_state, last_reward_hat, last_termination_hat, last_dist_feat = self.predict_next(
                 self.state_buffer[:, i:i+1],
                 self.action_buffer[:, i:i+1])
