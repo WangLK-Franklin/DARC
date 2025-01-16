@@ -35,7 +35,8 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
-    parser.add_argument('--trainer_mode', type=str, default="0115_tt_nopretrain")
+    parser.add_argument('--trainer_mode', type=str, default="darc_pretraintt_20")
+    # parser.add_argument('--trainer_mode', type=str, default="darc_pretraitt_20")
     
     parser.add_argument(
         "--trainer",
@@ -46,9 +47,14 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="gym_walker2d", help="id of environment")
-    parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="DARC", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=12345, help="Global seed")
+    parser.add_argument("--batch_length", type=int, default=8)
+    parser.add_argument("--replay_start", type=int, default=100000)
+    parser.add_argument("--replay_interval", type=int, default=10000)
+    parser.add_argument("--pre_train_step", type=int, default=100000)
+    parser.add_argument("--sample_batch_size", type=int, default=8)
     ################################################
     
     # 1. Parameters for environment 
@@ -139,8 +145,6 @@ if __name__ == "__main__":
     ################################################
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
-    # Batch size of sampler for buffer store    
-    parser.add_argument("--sample_batch_size", type=int, default=8)
     # Add noise to action for better exploration
     parser.add_argument("--noise_params", type=dict, default=None)
 

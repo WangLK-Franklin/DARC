@@ -248,12 +248,13 @@ class DARC(AlgorithmBase):
         return mean, std, q_value
 
     def _compute_loss_q(self, data: DataDict):
-        obs, act, rew, obs2, done = (
+        obs, act, rew, obs2, done,weight = (
             data["obs"],
             data["act"],
             data["rew"],
             data["obs2"],
             data["done"],
+            data["weight"]
         )
         logits_2 = self.networks.policy_target(obs2)
         act2_dist = self.networks.create_action_distributions(logits_2)
@@ -306,17 +307,17 @@ class DARC(AlgorithmBase):
         q2_std_detach = torch.clamp(q2_std, min=0.).detach()
         bias = 0.1
 
-        q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(
+        q1_loss = (torch.pow(self.mean_std1, 2) + bias) *torch.mean(weight*(
             -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ bias)*q1
             -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +bias)
             )*q1_std
-        )
+        ))
 
-        q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(
+        q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(weight*(
             -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ bias)*q2
             -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
             )*q2_std
-        )
+        ))
 
 
         return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach()

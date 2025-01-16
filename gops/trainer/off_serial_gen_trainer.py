@@ -127,9 +127,9 @@ class OffSerialGenTrainer:
             self.replay_interval = 1
             self.pre_train_step = 1
         else:
-            self.replay_start = kwargs.get("replay_start", 200000)
+            self.replay_start = kwargs.get("replay_start", 100000)
             self.replay_interval = kwargs.get("replay_interval", 10000)
-            self.pre_train_step = 1
+            self.pre_train_step = kwargs.get("pre_train_step", 100000)
         self.writer = SummaryWriter(log_dir=self.save_folder, flush_secs=20)
        
         add_scalars(
@@ -149,7 +149,7 @@ class OffSerialGenTrainer:
                 "device": self.device,
                 "logger": self.writer,
                 "warmup_length": kwargs.get("buffer_warm_size", 1000),
-                "sample_horizon":8,
+                "sample_horizon":self.batch_length,
                 "sample_interval":1 
 
             }
@@ -180,10 +180,10 @@ class OffSerialGenTrainer:
             self.buffer.add_batch(samples)
         self.sampler_tb_dict = LogData()
 
-        self.behavior_policy = copy.deepcopy(self.alg.networks)
-        self.behavior_policy.load_state_dict(torch.load(self.behavior_path))
-        self.behavior_policy.eval()
-        self.behavior_policy.to('cuda')
+        # self.behavior_policy = copy.deepcopy(self.alg.networks)
+        # self.behavior_policy.load_state_dict(torch.load(self.behavior_path))
+        # self.behavior_policy.eval()
+        # self.behavior_policy.to('cuda')
         
         while not self.world_replayer.ready():
             world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
@@ -194,7 +194,7 @@ class OffSerialGenTrainer:
         
         pbar = tqdm(range(self.pre_train_step), desc='Pre-training World Model')
         for i in pbar:
-            world_samples = self.world_sampler.sample(self.iteration,self.behavior_policy,use_random=True)
+            world_samples = self.world_sampler.sample(self.iteration,self.networks,use_random=True)
             self.world_replayer.append(world_samples)
             self.world_model.train()
             with torch.set_grad_enabled(True):
@@ -246,7 +246,7 @@ class OffSerialGenTrainer:
             importance_score = self.dynamics_discriminator.forward(state[:, :1].squeeze(1).float(),
                                                                    action.squeeze(1).float(),
                                                                    state[:, 1:].squeeze(1).float())
-            weight = torch.clip(importance_score[:, 0] / (importance_score[:, 1] + 1e-6), 0, 10)
+            weight = torch.clip(importance_score[:, 0] / (importance_score[:, 1] + 1e-6), 0, 3)
         else:
             weight = torch.ones(imagine_batch_size)
         imagine_samples = {
@@ -287,20 +287,6 @@ class OffSerialGenTrainer:
                             real_samples[key],
                             real_samples[key][:imagine_batch_size]
                         ], dim=0)
-            
-            # self.generator_model.mode = "entropy"
-            # gen_state_for_policy = self.generator_model.guided_sample_batch(
-            # batch_size=self.replay_batch_size, 
-            # world_model=self.world_model, 
-            # policy_net=self.networks
-            # )
-            # policy_samples = {
-            #     "obs": gen_state_for_policy.detach().to('cpu'),
-            #     "act": action.squeeze(1).to('cpu'),
-            #     "rew": reward_hat.squeeze(1).to('cpu'),
-            #     "done": termination_hat.squeeze(1).to('cpu'),
-            #     "obs_next": gen_state_for_policy.detach().to('cpu')
-            # }
             return mixed_samples
         
         # 如果world_replayer还没准备好，返回全部真实数据
@@ -328,19 +314,21 @@ class OffSerialGenTrainer:
 
         # replay
         replay_samples = self.mixed_sample()
-        # replay_samples = self.buffer.sample_batch(self.replay_batch_size)
-        # if self.iteration < self.replay_start:
-        #     self.dynamics_discriminator.train()
-        #     env_samples = copy.deepcopy(replay_samples)
-        #     positive_samples = (env_samples["obs"].to('cuda:0'), env_samples["act"].to('cuda:0'), env_samples["obs2"].to('cuda:0'))
-        #     imagine_samples = self.get_imagine_samples(self.replay_batch_size, is_train=True)
-        #     negative_samples = (imagine_samples["obs"].to('cuda:0').detach(), 
-        #                         imagine_samples["act"].to('cuda:0').detach(), 
-        #                         imagine_samples["obs2"].to('cuda:0').detach())
-        #     discriminator_td = self.dynamics_discriminator.update_step(positive_samples, negative_samples)
-        #     add_scalars(discriminator_td, self.writer, step=self.iteration)
-        #     print("train dynamics discriminator")
-        #     self.dynamics_discriminator.eval()
+        
+        if self.iteration < self.replay_start and self.iteration % self.trainning_interval == 0:
+            self.dynamics_discriminator.train()
+            env_samples = copy.deepcopy(replay_samples)
+            positive_samples = (env_samples["obs"].to('cuda:0'), env_samples["act"].to('cuda:0'), env_samples["obs2"].to('cuda:0'))
+            imagine_samples = self.get_imagine_samples(self.replay_batch_size, is_train=True)
+            negative_samples = (imagine_samples["obs"].to('cuda:0').detach(), 
+                                imagine_samples["act"].to('cuda:0').detach(), 
+                                imagine_samples["obs2"].to('cuda:0').detach())
+            discriminator_td = self.dynamics_discriminator.update_step(positive_samples, negative_samples)
+            add_scalars(discriminator_td, self.writer, step=self.iteration)
+            # print("train dynamics discriminator")
+            self.dynamics_discriminator.eval()
+        
+        
         # learning
         if self.use_gpu:
                 for k, v in replay_samples.items():

@@ -36,7 +36,7 @@ class Dynamics_discriminator(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.2),
             
-            nn.Linear(512, 64),
+            nn.Linear(256, 64),
             nn.LayerNorm(64),
             nn.ReLU(),
             
